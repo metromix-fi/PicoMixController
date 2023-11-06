@@ -1,3 +1,5 @@
+//#include <sys/stat.h>
+//#include <sys/cdefs.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -7,6 +9,8 @@
 #include "FreeRTOS.h"
 #include "FreeRTOSConfig.h"
 #include "task.h"
+
+#include "networking/httpclient.h"
 
 #include "display/ssd1306.h"
 #include "display/image.h"
@@ -22,7 +26,7 @@ const uint8_t *fonts[4] = {acme_font, bubblesstandard_font, crackers_font, BMSPA
 
 void setup_gpios(void);
 
-void animationTask(void *param);
+_Noreturn void animationTask(void *param);
 
 int main() {
     stdio_init_all();
@@ -32,13 +36,25 @@ int main() {
 
     printf("jumping to animationTask...\n");
 
-    TaskHandle_t animationTaskHandle = NULL;
+    // Networking
+    TaskHandle_t networking_task_handle = NULL;
+    xTaskCreate(
+                networkTask,
+                "networking task",
+                1024,
+                NULL,
+                tskIDLE_PRIORITY + 1,
+                &networking_task_handle
+            );
+
+    // Display
+    TaskHandle_t animation_task_handle = NULL;
     xTaskCreate(animationTask,
                 "animationTask",
                 1024,
                 NULL,
                 tskIDLE_PRIORITY + 1,
-                &animationTaskHandle
+                &animation_task_handle
                 );
 
     vTaskStartScheduler();
@@ -55,7 +71,7 @@ void setup_gpios(void) {
     gpio_pull_up(15);
 }
 
-void animationTask(void *param) {
+_Noreturn void animationTask(void *param) {
     const char *words[] = {"SSD1306", "DISPLAY", "DRIVER"};
 
     ssd1306_t disp;
@@ -118,6 +134,7 @@ void animationTask(void *param) {
 
         ssd1306_bmp_show_image(&disp, image_data, image_size);
         ssd1306_show(&disp);
+        printf("finished animation loop\n");
         vTaskDelay(2000);
     }
 }
