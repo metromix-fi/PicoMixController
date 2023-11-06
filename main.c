@@ -10,6 +10,8 @@
 #include "FreeRTOSConfig.h"
 #include "task.h"
 
+#include "input/inputhandler.h"
+
 #include "networking/httpclient.h"
 
 #include "display/ssd1306.h"
@@ -35,6 +37,17 @@ int main() {
     setup_gpios();
 
     printf("jumping to animationTask...\n");
+
+    // Input
+    TaskHandle_t input_handler_task_handle = NULL;
+    xTaskCreate(
+                input_handler_task,
+                "input handler task",
+                1024,
+                NULL,
+                tskIDLE_PRIORITY + 1,
+                &input_handler_task_handle
+            );
 
     // Networking
     TaskHandle_t networking_task_handle = NULL;

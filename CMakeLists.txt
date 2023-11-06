@@ -38,6 +38,8 @@ add_executable(metromix
 		networking/httpclient.c
 		networking/httpclient.h
 		networking/tls_common.c
+		input/inputhandler.c
+		input/inputhandler.h
 )
 
 target_link_libraries(metromix
