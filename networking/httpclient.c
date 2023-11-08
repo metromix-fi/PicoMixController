@@ -46,11 +46,7 @@ _Noreturn void networkTask(void *param) {
                 printf("Test failed\n");
             }
             /* sleep a bit to let usb stdio write out any buffer to host */
-            vTaskDelay(1000);
+            vTaskDelay(10000);
         }
     }
-    cyw43_arch_deinit();
-    printf("All done\n");
-    return;
-
 }
