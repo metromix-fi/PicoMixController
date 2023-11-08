@@ -40,6 +40,10 @@ add_executable(metromix
 		networking/tls_common.c
 		input/inputhandler.c
 		input/inputhandler.h
+        utils/GlobalState.c
+        utils/GlobalState.h
+		display/animationtask.c
+		display/animationtask.h
 )
 
 target_link_libraries(metromix
