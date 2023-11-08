@@ -1,8 +1,8 @@
-#include <sys/cdefs.h>
 //
 // Created by jesse on 06.11.23.
 //
 
+#include <sys/cdefs.h>
 #include "inputhandler.h"
 #include <stdio.h>
 #include <stdint.h>
@@ -36,12 +36,15 @@ static void enable_interrupts() {
     // Activate the interrupts
     gpio_set_irq_enabled_with_callback(ROTARY_A, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &input_isr);
     gpio_set_irq_enabled(ROTARY_B, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
+    gpio_set_irq_enabled(ROTARY_PUSH, GPIO_IRQ_EDGE_RISE, true);
 }
 
+// TODO: Needs enabling/disabling during the ISR?
 static void disable_interrupts() {
     // Deactivate the interrupts
     gpio_set_irq_enabled(ROTARY_A, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, false);
     gpio_set_irq_enabled(ROTARY_B, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, false);
+    gpio_set_irq_enabled(ROTARY_PUSH, GPIO_IRQ_EDGE_RISE, false);
 }
 
 
@@ -51,10 +54,14 @@ void setup_input_gpios(void) {
     gpio_set_dir(ROTARY_A, GPIO_IN);
     gpio_pull_up(ROTARY_A);
 
-
     gpio_init(ROTARY_B);
     gpio_set_dir(ROTARY_B, GPIO_IN);
     gpio_pull_up(ROTARY_B);
+
+
+    gpio_init(ROTARY_PUSH);
+    gpio_set_dir(ROTARY_PUSH, GPIO_IN);
+    gpio_pull_up(ROTARY_PUSH);
 
     enable_interrupts();
 }
@@ -62,7 +69,7 @@ void setup_input_gpios(void) {
 
 void input_isr(uint gpio, uint32_t events) {
 
-    disable_interrupts();
+//    disable_interrupts();
 
 //    printf("ISR triggered on GPIO %d\n", gpio);
     int8_t value = 0;
@@ -109,16 +116,20 @@ void input_isr(uint gpio, uint32_t events) {
             }
         }
         lastBState = currentBState;
+    } else { // ROTARY_PUSH
+        printf("Push button pressed\n");
+        value = 10;
+        xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value , NULL);
     }
 
-    enable_interrupts();
+//    enable_interrupts();
 }
 
 // TODO: Can be removed?
-_Noreturn void input_handler_task(void *pvParameters) {
-
-    for (;;) {
+//_Noreturn void input_handler_task(void *pvParameters) {
+//
+//    for (;;) {
 //        printf("Input loop. Value: %d\n", displayedNumber);
-        vTaskDelay(1000);
-    }
-}
+//        vTaskDelay(1000);
+//    }
+//}

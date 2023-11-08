@@ -29,17 +29,6 @@ int main() {
 
     printf("Creating tasks...\n");
 
-    // Input
-    TaskHandle_t input_handler_task_handle = NULL;
-    xTaskCreate(
-                input_handler_task,
-                "input handler task",
-                1024,
-                NULL,
-                tskIDLE_PRIORITY + 2,
-                &input_handler_task_handle
-            );
-
     // Networking
 //    TaskHandle_t networking_task_handle = NULL;
 //    xTaskCreate(
