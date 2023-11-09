@@ -14,13 +14,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "display/animationtask.h"
-#include "display/BMSPA_font.h"
-#include "display/crackers_font.h"
-#include "display/bubblesstandard_font.h"
-#include "display/acme_5_outlines_font.h"
-#include "display/image.h"
-#include "display/ssd1306.h"
+#include "BMSPA_font.h"
+#include "crackers_font.h"
+#include "bubblesstandard_font.h"
+#include "acme_5_outlines_font.h"
+#include "image.h"
+#include "ssd1306.h"
 
 #include "animationtask.h"
 #include "queue.h"

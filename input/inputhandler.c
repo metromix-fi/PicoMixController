@@ -26,11 +26,6 @@ void input_isr(uint gpio, uint32_t events);
 /* GOBAL STATE */
 //GlobalStruct_t globalStruct;
 
-// Variables to keep track of the displayed number
-static unsigned char displayedNumber = 1;
-static unsigned char lastBState = 0;
-static unsigned char lastAState = 0;
-
 
 static void enable_interrupts() {
     // Activate the interrupts
@@ -45,6 +40,17 @@ static void disable_interrupts() {
     gpio_set_irq_enabled(ROTARY_A, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, false);
     gpio_set_irq_enabled(ROTARY_B, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, false);
     gpio_set_irq_enabled(ROTARY_PUSH, GPIO_IRQ_EDGE_RISE, false);
+}
+
+static void disable_rotary_push_interrupt() {
+    // Deactivate the interrupt
+    gpio_set_irq_enabled(ROTARY_PUSH, GPIO_IRQ_EDGE_RISE, false);
+}
+
+static int64_t enable_rotary_push_interrupt() {
+    // Enable the interrupt
+    gpio_set_irq_enabled(ROTARY_PUSH, GPIO_IRQ_EDGE_RISE, true);
+    return 0;
 }
 
 
@@ -70,66 +76,53 @@ void setup_input_gpios(void) {
 void input_isr(uint gpio, uint32_t events) {
 
 //    disable_interrupts();
+    static unsigned char lastBState = 0;
+    static unsigned char lastAState = 0;
 
-//    printf("ISR triggered on GPIO %d\n", gpio);
     int8_t value = 0;
+
+    // printf("ISR triggered on GPIO %d\n", gpio);
 
     if (gpio == ROTARY_A) {
         unsigned char currentAState = events & GPIO_IRQ_EDGE_RISE;
-//        printf("Current A State: %d\n", currentAState);
+        // printf("Current A State: %d\n", currentAState);
         if (currentAState != lastAState) { // If there is a change in the state
             if (lastBState == 0 && currentAState == GPIO_IRQ_EDGE_RISE) {
                 /* Send a message to the queue */
                 value = 1;
                 xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
-
-                displayedNumber++; // Clockwise
-                printf("Clockwise Rotation. Value: %d\n", displayedNumber);
+                // printf("Clockwise Rotation. Value: %d\n", displayedNumber);
             } else if (lastBState == GPIO_IRQ_EDGE_RISE && currentAState == GPIO_IRQ_EDGE_RISE) {
                 /* Send a message to the queue */
                 value = -1;
                 xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
-
-                displayedNumber--; // Counter-clockwise
-                printf("Counter-clockwise Rotation. Value: %d\n", displayedNumber);
+                // printf("Counter-clockwise Rotation. Value: %d\n", displayedNumber);
             }
         }
         lastAState = currentAState;
     } else if (gpio == ROTARY_B) {
         unsigned char currentBState = events & GPIO_IRQ_EDGE_RISE;
-//        printf("Current B State: %d\n", currentBState);
+        // printf("Current B State: %d\n", currentBState);
         if (currentBState != lastBState) { // If there is a change in the state
             if (lastAState == 0 && currentBState == GPIO_IRQ_EDGE_RISE) {
                 /* Send a message to the queue */
                 value = -1;
                 xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
 
-                displayedNumber--; // Counter-clockwise
-                printf("Counter-clockwise Rotation. Value: %d\n", displayedNumber);
             } else if (lastAState == GPIO_IRQ_EDGE_RISE && currentBState == GPIO_IRQ_EDGE_RISE) {
                 /* Send a message to the queue */
                 value = 1;
                 xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
-
-                displayedNumber++; // Clockwise
-                printf("Clockwise Rotation. Value: %d\n", displayedNumber);
             }
         }
         lastBState = currentBState;
     } else { // ROTARY_PUSH
-        printf("Push button pressed\n");
+        // printf("Push button pressed\n");
+        disable_rotary_push_interrupt();
         value = 10;
-        xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value , NULL);
+        xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
+        add_alarm_in_ms(30, enable_rotary_push_interrupt, NULL, false);
     }
 
-//    enable_interrupts();
+    //enable_interrupts();
 }
-
-// TODO: Can be removed?
-//_Noreturn void input_handler_task(void *pvParameters) {
-//
-//    for (;;) {
-//        printf("Input loop. Value: %d\n", displayedNumber);
-//        vTaskDelay(1000);
-//    }
-//}
