@@ -44,6 +44,8 @@ add_executable(metromix
         utils/GlobalState.h
 		display/animationtask.c
 		display/animationtask.h
+        display/renderer.c
+        display/renderer.h
 )
 
 target_link_libraries(metromix

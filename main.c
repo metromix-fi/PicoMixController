@@ -15,6 +15,7 @@
 #include "networking/httpclient.h"
 
 #include "display/animationtask.h"
+#include "display/renderer.h"
 #include "utils/GlobalState.h"
 
 
@@ -49,6 +50,17 @@ int main() {
                 tskIDLE_PRIORITY + 3,
                 &animation_task_handle
                 );
+
+// Rendering
+//    TaskHandle_t rendering_task_handle = NULL;
+//    xTaskCreate(
+//            renderingTask,
+//            "rendering task",
+//            1024,
+//            NULL,
+//            tskIDLE_PRIORITY + 3,
+//            &rendering_task_handle
+//    );
 
     vTaskStartScheduler();
 

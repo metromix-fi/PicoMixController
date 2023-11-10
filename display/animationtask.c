@@ -41,6 +41,11 @@ static void displayNumber(ssd1306_t *disp, int value) {
     ssd1306_show(disp);
 }
 
+static void display_img(ssd1306_t *disp) {
+    ssd1306_bmp_show_image(disp, image_data, image_size);
+    ssd1306_show(disp);
+}
+
 void setup_display_gpios(void) {
     i2c_init(i2c1, 400000);
     gpio_set_function(14, GPIO_FUNC_I2C);
@@ -67,8 +72,9 @@ _Noreturn void animationTask(void *param) {
         state = state + rotary_input;
 //        uint8_t i = (state / 8) % 3;
         displayNumber(&disp, state);
+//        display_img(&disp);
 //        ssd1306_draw_string(&disp, 8, 24, 2, words[i]);
-//        ssd1306_show(&disp);
+        ssd1306_show(&disp);
 //        vTaskDelay(800);
 //        ssd1306_clear(&disp);W
 
