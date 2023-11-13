@@ -46,11 +46,18 @@ add_executable(metromix
 		display/animationtask.h
         display/renderer.c
         display/renderer.h
+		rfid/rfidtask.c
+		rfid/rfidtask.h
+		rfid/mfrc522.c
+		rfid/mfrc522.h
+		rfid/rfid-spi.c
+		rfid/rfid-spi.h
 )
 
 target_link_libraries(metromix
         pico_stdlib
         hardware_i2c
+		hardware_spi
         FreeRTOS
 		pico_lwip_mbedtls
 		pico_mbedtls

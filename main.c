@@ -16,7 +16,10 @@
 
 #include "display/animationtask.h"
 #include "display/renderer.h"
+
 #include "utils/GlobalState.h"
+
+#include "rfid/rfidtask.h"
 
 
 int main() {
@@ -27,6 +30,8 @@ int main() {
     printf("configuring pins...\n");
     setup_display_gpios();
     setup_input_gpios();
+    setup_rfid_gpios();
+
 
     printf("Creating tasks...\n");
 
@@ -42,14 +47,14 @@ int main() {
 //            );
 
     // Display
-    TaskHandle_t animation_task_handle = NULL;
-    xTaskCreate(animationTask,
-                "animationTask",
-                1024,
-                NULL,
-                tskIDLE_PRIORITY + 3,
-                &animation_task_handle
-                );
+//    TaskHandle_t animation_task_handle = NULL;
+//    xTaskCreate(animationTask,
+//                "animationTask",
+//                1024,
+//                NULL,
+//                tskIDLE_PRIORITY + 3,
+//                &animation_task_handle
+//                );
 
 // Rendering
 //    TaskHandle_t rendering_task_handle = NULL;
@@ -61,6 +66,17 @@ int main() {
 //            tskIDLE_PRIORITY + 3,
 //            &rendering_task_handle
 //    );
+
+    // RFID
+    TaskHandle_t rfid_task_handle = NULL;
+    xTaskCreate(
+            rfid_task,
+            "rfid task",
+            1024,
+            NULL,
+            tskIDLE_PRIORITY + 2,
+            &rfid_task_handle
+    );
 
     vTaskStartScheduler();
 

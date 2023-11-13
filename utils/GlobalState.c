@@ -10,5 +10,6 @@ GlobalStruct_t globalStruct;
 
 void initializeGlobalStruct() {
     // Initialize queues
-    globalStruct.rotaryEncoderQueue = xQueueCreate(1024, sizeof(int8_t));
+    globalStruct.rotaryEncoderQueue = xQueueCreate(32, sizeof(int8_t));
+    globalStruct.rfidQueue = xQueueCreate(8 , sizeof(uint8_t));
 }

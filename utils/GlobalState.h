@@ -11,6 +11,7 @@
 
 typedef struct {
     QueueHandle_t rotaryEncoderQueue;
+    QueueHandle_t rfidQueue;
 } GlobalStruct_t;
 
 extern GlobalStruct_t globalStruct;
