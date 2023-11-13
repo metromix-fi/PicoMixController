@@ -5,18 +5,25 @@
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 #include "httpclient.h"
+#include "utils/GlobalState.h"
+#include "FreeRTOS.h"
+#include "queue.h"
 
-#define TLS_CLIENT_SERVER        "192.168.122.226"
-#define TLS_CLIENT_HTTP_REQUEST  "GET /api HTTP/1.1\r\n" \
-                                 "Host: " TLS_CLIENT_SERVER"\r\n" \
-                                 "Connection: close\r\n" \
-                                 "\r\n"
+#define TLS_CLIENT_SERVER        "192.168.150.226"
+
 #define TLS_CLIENT_TIMEOUT_SECS  15
 
 extern bool run_tls_client_test(const uint8_t *cert, size_t cert_len, const char *server, const char *request, int timeout);
 
 _Noreturn void networkTask(void *param) {
     printf("networkTask\n");
+
+    char request[] = "POST /api HTTP/1.1\r\n" \
+                                 "Host: " TLS_CLIENT_SERVER"\r\n" \
+                                 "Content-Type: text/plain\r\n" \
+                                 "Content-Length: 2\r\n" \
+                                 "Connection: close\r\n" \
+                                 "\r\n";
 
     for(;;) {
 
@@ -36,9 +43,14 @@ _Noreturn void networkTask(void *param) {
             vTaskDelay(1000);
             continue;
         }
+
+        char rfid_state[2] = "00";
+
         for (;;) {
+            xQueueReceive(globalStruct.rfidQueue, &rfid_state, portMAX_DELAY);
+
             printf("Connecting to server: " TLS_CLIENT_SERVER);
-            bool pass = run_tls_client_test(NULL, 0, TLS_CLIENT_SERVER, TLS_CLIENT_HTTP_REQUEST,
+            bool pass = run_tls_client_test(NULL, 0, TLS_CLIENT_SERVER, strcat(request, rfid_state),
                                             TLS_CLIENT_TIMEOUT_SECS);
             if (pass) {
                 printf("Test passed\n");
