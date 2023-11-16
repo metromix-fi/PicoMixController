@@ -98,6 +98,25 @@ uint8_t MFRC522ReadRegister(MFRC522Driver *mfrc522p, uint8_t addr) {
     return rx_data[1];
 }
 
+// Returns length of received data
+void MFRC522ReadRegisterBuffer(MFRC522Driver *mfrc522p, uint8_t addr, uint8_t count, uint8_t *values) {
+    uint8_t data[2];
+    uint8_t rx_data[count + 1];
+    data[0] = ((addr << 1) & 0x7E) | 0x80;
+    data[1] = 0xff;
+    gpio_put(CS, 0);
+//    spi_write_blocking(SPI_PORT, data, 2);
+    spi_read_blocking(SPI_PORT, data[0], rx_data, count + 1);
+    while(spi_is_busy(SPI_PORT)) {}
+    gpio_put(CS, 1);
+
+    for (uint8_t i = 0; i < count; i++) {
+        values[i] = rx_data[i + 1];
+    }
+
+//    return rx_data[1];
+}
+
 
 
 

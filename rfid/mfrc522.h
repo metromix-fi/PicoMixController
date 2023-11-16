@@ -134,6 +134,8 @@ extern void MFRC522WriteRegister(MFRC522Driver *mfrc522p, uint8_t addr, uint8_t 
 
 extern uint8_t MFRC522ReadRegister(MFRC522Driver *mfrc522p, uint8_t addr);
 
+extern void MFRC522ReadRegisterBuffer(MFRC522Driver *mfrc522p, uint8_t addr, uint8_t count, uint8_t *values);
+
 #endif /* HAL_USE_MFRC522 */
 
 /** @} */

@@ -124,8 +124,16 @@
 /*===========================================================================*/
 
 /*===========================================================================*/
-/* Driver local variables and types.                                         */
+/* OWN TYPES                                        */
 /*===========================================================================*/
+
+
+// A struct used for passing the UID of a PICC.
+typedef struct {
+    uint8_t 		size;			// Number of bytes in the UID. 4, 7 or 10.
+    uint8_t 		uidByte[10];
+    uint8_t 		sak;			// The SAK (Select acknowledge) byte returned from the PICC after successful selection.
+} Uid;
 
 
 /*===========================================================================*/
@@ -226,7 +234,7 @@ MifareToPICC(MFRC522Driver *mfrc522p, uint8_t command, uint8_t *sendData, uint8_
         if (!(MFRC522ReadRegister(mfrc522p, MifareREG_ERROR) & 0x1B)) {
             status = MIFARE_OK;
             if (n & irqEn & 0x01) {
-                printf("MIFARE_NOTAGERR\n");
+//                printf("MIFARE_NOTAGERR\n");
                 status = MIFARE_NOTAGERR;
             }
 
@@ -249,11 +257,12 @@ MifareToPICC(MFRC522Driver *mfrc522p, uint8_t command, uint8_t *sendData, uint8_
                 }
 
                 if (n <= backDataLen) {
-                    printf("reading data\n");
+//                    printf("reading data\n");
                     //Reading the received data in FIFO
-                    for (i = 0; i < n; i++) {
-                        backData[i] = MFRC522ReadRegister(mfrc522p, MifareREG_FIFO_DATA);
-                    }
+//                    for (i = 0; i < n; i++) {
+//                        backData[i] = MFRC522ReadRegister(mfrc522p, MifareREG_FIFO_DATA);
+//                    }
+                    MFRC522ReadRegisterBuffer(mfrc522p, MifareREG_FIFO_DATA, n, backData);
                 } else {
                     status = MIFARE_ERR;
                 }
@@ -264,7 +273,7 @@ MifareToPICC(MFRC522Driver *mfrc522p, uint8_t command, uint8_t *sendData, uint8_
         }
     }
 
-    printf("MifareToPICC status: %x\n", status);
+//    printf("MifareToPICC status: %x\n", status);
     return status;
 }
 
@@ -279,6 +288,7 @@ uint8_t MFRC522AntiCollisionLoop(MFRC522Driver *mfrc522p, uint8_t selcommand, ui
 
     command[0] = selcommand; // SEL
     command[1] = 0x20; // NVB
+//    MFRC522WriteRegister(mfrc522p ,MifareREG_COLL, 0x80);
     status = MifareToPICC(mfrc522p, PCD_TRANSCEIVE, command, 2, cascadeLevel, sizeof(cascadeLevel), &unLen);
 
     if (status == MIFARE_OK) {
@@ -469,6 +479,241 @@ MIFARE_Status_t MifareAnticoll(MFRC522Driver *mfrc522p, struct MifareUID *id) {
     return MIFARE_OK;
 }
 
+
+/**
+ * @brief
+ *
+ * MY OWN SELECT METHOD
+ *
+ * @param[in] MFRC522p
+ *
+ * @api
+ */
+MIFARE_Status_t PICC_SELECT(MFRC522Driver *mfrc522p,Uid *uid) {
+    bool uidComplete;
+    bool selectDone;
+    bool useCascadeTag = false;
+    uint8_t cascadeLevel = 1;
+    MIFARE_Status_t result;
+    uint8_t count;
+    uint8_t checkBit;
+    uint8_t index;
+    uint8_t uidIndex;					// The first index in uid->uidByte[] that is used in the current Cascade Level.
+    int8_t currentLevelKnownBits;		// The number of known UID bits in the current Cascade Level.
+    uint8_t buffer[9];					// The SELECT/ANTICOLLISION commands uses a 7 byte standard frame + 2 bytes CRC_A
+    uint8_t bufferUsed;				// The number of bytes used in the buffer, ie the number of bytes to transfer to the FIFO.
+    uint8_t rxAlign;					// Used in BitFramingReg. Defines the bit position for the first bit received.
+    uint8_t txLastBits;				// Used in BitFramingReg. The number of valid bits in the last transmitted byte.
+    uint8_t *responseBuffer;
+    uint8_t responseLength;
+
+    // Description of buffer structure:
+    //		Byte 0: SEL 				Indicates the Cascade Level: PICC_CMD_SEL_CL1, PICC_CMD_SEL_CL2 or PICC_CMD_SEL_CL3
+    //		Byte 1: NVB					Number of Valid Bits (in complete command, not just the UID): High nibble: complete bytes, Low nibble: Extra bits.
+    //		Byte 2: UID-data or CT		See explanation below. CT means Cascade Tag.
+    //		Byte 3: UID-data
+    //		Byte 4: UID-data
+    //		Byte 5: UID-data
+    //		Byte 6: BCC					Block Check Character - XOR of bytes 2-5
+    //		Byte 7: CRC_A
+    //		Byte 8: CRC_A
+    // The BCC and CRC_A are only transmitted if we know all the UID bits of the current Cascade Level.
+    //
+    // Description of bytes 2-5: (Section 6.5.4 of the ISO/IEC 14443-3 draft: UID contents and cascade levels)
+    //		UID size	Cascade level	Byte2	Byte3	Byte4	Byte5
+    //		========	=============	=====	=====	=====	=====
+    //		 4 bytes		1			uid0	uid1	uid2	uid3
+    //		 7 bytes		1			CT		uid0	uid1	uid2
+    //						2			uid3	uid4	uid5	uid6
+    //		10 bytes		1			CT		uid0	uid1	uid2
+    //						2			CT		uid3	uid4	uid5
+    //						3			uid6	uid7	uid8	uid9
+
+    // Sanity checks
+//    if (validBits > 80) {
+//        return STATUS_INVALID;
+//    }
+
+    // Prepare MFRC522
+    MFRC522WriteRegister(mfrc522p ,MifareREG_COLL, 0x80);		// ValuesAfterColl=1 => Bits received after collision are cleared.
+
+    // Repeat Cascade Level loop until we have a complete UID.
+    uidComplete = false;
+    while (!uidComplete) {
+        // Set the Cascade Level in the SEL byte, find out if we need to use the Cascade Tag in byte 2.
+        switch (cascadeLevel) {
+            case 1:
+                buffer[0] = PICC_ANTICOLL_CL1;
+                uidIndex = 0;
+//                useCascadeTag = validBits && uid->size > 4;	// When we know that the UID has more than 4 bytes
+                break;
+
+            case 2:
+                buffer[0] = PICC_ANTICOLL_CL2;
+                uidIndex = 3;
+//                useCascadeTag = validBits && uid->size > 7;	// When we know that the UID has more than 7 bytes
+                break;
+
+            case 3:
+                buffer[0] = PICC_ANTICOLL_CL3;
+                uidIndex = 6;
+                useCascadeTag = false;						// Never used in CL3.
+                break;
+
+            default:
+                return MIFARE_ERR;
+                break;
+        }
+
+        // How many UID bits are known in this Cascade Level?
+        currentLevelKnownBits = 0;
+//        currentLevelKnownBits = validBits - (8 * uidIndex);
+//        if (currentLevelKnownBits < 0) {
+//            currentLevelKnownBits = 0;
+//        }
+        // Copy the known bits from uid->uidByte[] to buffer[]
+//        index = 2; // destination index in buffer[]
+//        if (useCascadeTag) {
+//            buffer[index++] = PICC_CMD_CT;
+//        }
+//        uint8_t bytesToCopy = currentLevelKnownBits / 8 + (currentLevelKnownBits % 8 ? 1 : 0); // The number of bytes needed to represent the known bits for this level.
+//        if (bytesToCopy) {
+//            uint8_t maxBytes = useCascadeTag ? 3 : 4; // Max 4 bytes in each Cascade Level. Only 3 left if we use the Cascade Tag
+//            if (bytesToCopy > maxBytes) {
+//                bytesToCopy = maxBytes;
+//            }
+//            for (count = 0; count < bytesToCopy; count++) {
+//                buffer[index++] = uid->uidByte[uidIndex + count];
+//            }
+//        }
+//         Now that the data has been copied we need to include the 8 bits in CT in currentLevelKnownBits
+//        if (useCascadeTag) {
+//            currentLevelKnownBits += 8;
+//        }
+
+        // Repeat anti collision loop until we can transmit all UID bits + BCC and receive a SAK - max 32 iterations.
+        selectDone = false;
+        while (!selectDone) {
+            // Find out how many bits and bytes to send and receive.
+            if (currentLevelKnownBits >= 32) { // All UID bits in this Cascade Level are known. This is a SELECT.
+                //Serial.print(F("SELECT: currentLevelKnownBits=")); Serial.println(currentLevelKnownBits, DEC);
+                buffer[1] = 0x70; // NVB - Number of Valid Bits: Seven whole bytes
+                // Calculate BCC - Block Check Character
+                buffer[6] = buffer[2] ^ buffer[3] ^ buffer[4] ^ buffer[5];
+                // Calculate CRC_A
+//                result = PCD_CalculateCRC(buffer, 7, &buffer[7]);
+//                if (result != STATUS_OK) {
+//                    return result;
+//                }
+                txLastBits		= 0; // 0 => All 8 bits are valid.
+                bufferUsed		= 9;
+                // Store response in the last 3 bytes of buffer (BCC and CRC_A - not needed after tx)
+                responseBuffer	= &buffer[6];
+                responseLength	= 3;
+            }
+            else { // This is an ANTICOLLISION.
+                //Serial.print(F("ANTICOLLISION: currentLevelKnownBits=")); Serial.println(currentLevelKnownBits, DEC);
+                txLastBits		= currentLevelKnownBits % 8;
+                count			= currentLevelKnownBits / 8;	// Number of whole bytes in the UID part.
+                index			= 2 + count;					// Number of whole bytes: SEL + NVB + UIDs
+                buffer[1]		= (index << 4) + txLastBits;	// NVB - Number of Valid Bits
+                bufferUsed		= index + (txLastBits ? 1 : 0);
+                // Store response in the unused part of buffer
+                responseBuffer	= &buffer[index];
+                responseLength	= sizeof(buffer) - index;
+            }
+
+            // Set bit adjustments
+            rxAlign = txLastBits;											// Having a separate variable is overkill. But it makes the next line easier to read.
+            MFRC522WriteRegister(mfrc522p, MifareREG_BIT_FRAMING, (rxAlign << 4) + txLastBits);	// RxAlign = BitFramingReg[6..4]. TxLastBits = BitFramingReg[2..0]
+
+            uint16_t backLen = 0;
+            // Transmit the buffer and receive the response.
+            result = MifareToPICC(mfrc522p,PCD_TRANSCEIVE, buffer, bufferUsed, responseBuffer, responseLength, &backLen);
+
+
+            uint8_t errorRegValue = MFRC522ReadRegister(mfrc522p, MifareREG_ERROR);
+            bool collision = errorRegValue & 0x08;
+            // Tell about collisions
+//            if (errorRegValue & 0x08) {		// CollErr
+//                return STATUS_COLLISION;
+//            }
+
+//            result = PCD_TransceiveData(buffer, bufferUsed, responseBuffer, &responseLength, &txLastBits, rxAlign);
+            if (collision) { // More than one PICC in the field => collision.
+                uint8_t valueOfCollReg = MFRC522ReadRegister(mfrc522p ,MifareREG_COLL); // CollReg[7..0] bits are: ValuesAfterColl reserved CollPosNotValid CollPos[4:0]
+                if (valueOfCollReg & 0x20) { // CollPosNotValid
+                    printf("CollPosNotValid\n");
+                    return MIFARE_ERR; // Without a valid collision position we cannot continue
+                }
+                uint8_t collisionPos = valueOfCollReg & 0x1F; // Values 0-31, 0 means bit 32.
+                if (collisionPos == 0) {
+                    collisionPos = 32;
+                }
+                if (collisionPos <= currentLevelKnownBits) { // No progress - should not happen
+                    printf("No progress\n");
+                    return MIFARE_ERR;
+                }
+                // Choose the PICC with the bit set.
+                currentLevelKnownBits	= collisionPos;
+                count			= currentLevelKnownBits % 8; // The bit to modify
+                checkBit		= (currentLevelKnownBits - 1) % 8;
+                index			= 1 + (currentLevelKnownBits / 8) + (count ? 1 : 0); // First byte is index 0.
+                buffer[index]	|= (1 << checkBit);
+            }
+            else if (result != MIFARE_OK) {
+                printf("result != MIFARE_OK\n");
+                return result;
+            }
+            else { // STATUS_OK
+                if (currentLevelKnownBits >= 32) { // This was a SELECT.
+                    selectDone = true; // No more anticollision
+                    // We continue below outside the while.
+                }
+                else { // This was an ANTICOLLISION.
+                    // We now have all 32 bits of the UID in this Cascade Level
+                    currentLevelKnownBits = 32;
+                    // Run loop again to do the SELECT.
+                }
+            }
+        } // End of while (!selectDone)
+
+        // We do not check the CBB - it was constructed by us above.
+
+        // Copy the found UID bytes from buffer[] to uid->uidByte[]
+//        index			= (buffer[2] == PICC_CMD_CT) ? 3 : 2; // source index in buffer[]
+//        bytesToCopy		= (buffer[2] == PICC_CMD_CT) ? 3 : 4;
+//        for (count = 0; count < bytesToCopy; count++) {
+//            uid->uidByte[uidIndex + count] = buffer[index++];
+//        }
+
+        // Check response SAK (Select Acknowledge)
+//        if (responseLength != 3 || txLastBits != 0) { // SAK must be exactly 24 bits (1 byte + CRC_A).
+//            return STATUS_ERROR;
+//        }
+        // Verify CRC_A - do our own calculation and store the control in buffer[2..3] - those bytes are not needed anymore.
+//        result = PCD_CalculateCRC(responseBuffer, 1, &buffer[2]);
+//        if (result != STATUS_OK) {
+//            return result;
+//        }
+//        if ((buffer[2] != responseBuffer[1]) || (buffer[3] != responseBuffer[2])) {
+//            return STATUS_CRC_WRONG;
+//        }
+//        if (responseBuffer[0] & 0x04) { // Cascade bit set - UID not complete yes
+//            cascadeLevel++;
+//        }
+//        else {
+//            uidComplete = true;
+//            uid->sak = responseBuffer[0];
+//        }
+    } // End of while (!uidComplete)
+
+    // Set correct uid->size
+    uid->size = 3 * cascadeLevel + 1;
+
+    return MIFARE_OK;
+} // End PICC_Select()
+
 /**
  * @brief
  *
@@ -641,6 +886,11 @@ MIFARE_Status_t MifareCheck(MFRC522Driver *mfrc522p, struct MifareUID *id) {
         //Card detected
         //Anti-collision, return card serial number 4 bytes
         status = MifareAnticoll(mfrc522p, id);
+
+
+//        Uid uid;
+//
+//        status = PICC_SELECT(mfrc522p, &uid);
     }
     MifareHalt(mfrc522p);          //Command card into hibernation
 
@@ -730,5 +980,94 @@ void MFRC522Selftest(MFRC522Driver *mfrc522p) {
     for (int i = 1; i < 65; ++i) {
         printf("%x \n", rx_data[i]);
     }
-
 }
+
+//void MFRC522GetData(MFRC522Driver *mfrc522p, uint8_t *uid[], uint8_t *uid_len ) {
+//    uint8_t tx_data[2];
+//    uint8_t rx_data[65];
+//    tx_data[0] = ((MifareREG_FIFO_DATA << 1) & 0x7E) | 0x80;
+//    tx_data[1] = 0xff;
+//
+//
+//    // Repeat anti collision loop until we can transmit all UID bits + BCC and receive a SAK - max 32 iterations.
+//    bool selectDone = false;
+//    while (!selectDone) {
+//        // Find out how many bits and bytes to send and receive.
+//        if (currentLevelKnownBits >= 32) { // All UID bits in this Cascade Level are known. This is a SELECT.
+//            //Serial.print(F("SELECT: currentLevelKnownBits=")); Serial.println(currentLevelKnownBits, DEC);
+//            buffer[1] = 0x70; // NVB - Number of Valid Bits: Seven whole bytes
+//            // Calculate BCC - Block Check Character
+//            buffer[6] = buffer[2] ^ buffer[3] ^ buffer[4] ^ buffer[5];
+//            // Calculate CRC_A
+//            result = PCD_CalculateCRC(buffer, 7, &buffer[7]);
+//            if (result != STATUS_OK) {
+//                return result;
+//            }
+//            txLastBits		= 0; // 0 => All 8 bits are valid.
+//            bufferUsed		= 9;
+//            // Store response in the last 3 bytes of buffer (BCC and CRC_A - not needed after tx)
+//            responseBuffer	= &buffer[6];
+//            responseLength	= 3;
+//        }
+//        else { // This is an ANTICOLLISION.
+//            //Serial.print(F("ANTICOLLISION: currentLevelKnownBits=")); Serial.println(currentLevelKnownBits, DEC);
+//            txLastBits		= currentLevelKnownBits % 8;
+//            count			= currentLevelKnownBits / 8;	// Number of whole bytes in the UID part.
+//            index			= 2 + count;					// Number of whole bytes: SEL + NVB + UIDs
+//            buffer[1]		= (index << 4) + txLastBits;	// NVB - Number of Valid Bits
+//            bufferUsed		= index + (txLastBits ? 1 : 0);
+//            // Store response in the unused part of buffer
+//            responseBuffer	= &buffer[index];
+//            responseLength	= sizeof(buffer) - index;
+//        }
+//
+//        // Set bit adjustments
+//        rxAlign = txLastBits;											// Having a separate variable is overkill. But it makes the next line easier to read.
+//        PCD_WriteRegister(BitFramingReg, (rxAlign << 4) + txLastBits);	// RxAlign = BitFramingReg[6..4]. TxLastBits = BitFramingReg[2..0]
+//
+//        // Transmit the buffer and receive the response.
+//        result = PCD_TransceiveData(buffer, bufferUsed, responseBuffer, &responseLength, &txLastBits, rxAlign);
+//        if (result == STATUS_COLLISION) { // More than one PICC in the field => collision.
+//            uint8_t valueOfCollReg = PCD_ReadRegister(CollReg); // CollReg[7..0] bits are: ValuesAfterColl reserved CollPosNotValid CollPos[4:0]
+//            if (valueOfCollReg & 0x20) { // CollPosNotValid
+//                return STATUS_COLLISION; // Without a valid collision position we cannot continue
+//            }
+//            uint8_t collisionPos = valueOfCollReg & 0x1F; // Values 0-31, 0 means bit 32.
+//            if (collisionPos == 0) {
+//                collisionPos = 32;
+//            }
+//            if (collisionPos <= currentLevelKnownBits) { // No progress - should not happen
+//                return STATUS_INTERNAL_ERROR;
+//            }
+//            // Choose the PICC with the bit set.
+//            currentLevelKnownBits	= collisionPos;
+//            count			= currentLevelKnownBits % 8; // The bit to modify
+//            checkBit		= (currentLevelKnownBits - 1) % 8;
+//            index			= 1 + (currentLevelKnownBits / 8) + (count ? 1 : 0); // First byte is index 0.
+//            buffer[index]	|= (1 << checkBit);
+//        }
+//        else if (result != STATUS_OK) {
+//            return result;
+//        }
+//        else { // STATUS_OK
+//            if (currentLevelKnownBits >= 32) { // This was a SELECT.
+//                selectDone = true; // No more anticollision
+//                // We continue below outside the while.
+//            }
+//            else { // This was an ANTICOLLISION.
+//                // We now have all 32 bits of the UID in this Cascade Level
+//                currentLevelKnownBits = 32;
+//                // Run loop again to do the SELECT.
+//            }
+//        }
+//    } // End of while (!selectDone)
+//}
+
+
+
+
+
+
+
+
+
