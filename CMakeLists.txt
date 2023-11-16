@@ -80,13 +80,13 @@ target_compile_definitions(metromix PRIVATE
 pico_add_extra_outputs(metromix)
 
 
-pico_enable_stdio_usb(metromix 1) 
-pico_enable_stdio_uart(metromix 0) 
+pico_enable_stdio_usb(metromix 0)
+pico_enable_stdio_uart(metromix 1)
 
 # create map/bin/hex/uf2 file in addition to ELF.
 pico_add_extra_outputs(metromix)
 
 # copy project to pico
-add_custom_command(TARGET metromix
+#add_custom_command(TARGET metromix)
 
-POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/metromix.uf2 /run/media/jesse/RPI-RP2 )
+#POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/metromix.uf2 /run/media/jesse/RPI-RP2 )

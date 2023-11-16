@@ -7,6 +7,8 @@
  */
 
 #include "mfrc522.h"
+#include "FreeRTOS.h"
+#include "task.h"
 #include <string.h>
 #include <stdint.h>
 #include <pico/printf.h>
@@ -131,6 +133,12 @@
 /*===========================================================================*/
 static void MFRC522Reset(MFRC522Driver *mfrc522p) {
     MFRC522WriteRegister(mfrc522p, MifareREG_COMMAND, PCD_RESETPHASE);
+    uint8_t count = 0;
+    // TODO: needed?
+    while (MFRC522ReadRegister(mfrc522p, MifareREG_COMMAND) & (1 << 4) && count < 3) {
+        count++;
+        vTaskDelay(50);
+    };
 }
 
 static void MFRC522SetBitMask(MFRC522Driver *mfrc522p, uint8_t reg, uint8_t mask) {
@@ -157,6 +165,7 @@ static void MFRC522AntennaOff(MFRC522Driver *mfrc522p) {
 static MIFARE_Status_t
 MifareToPICC(MFRC522Driver *mfrc522p, uint8_t command, uint8_t *sendData, uint8_t sendLen, uint8_t *backData,
              uint8_t backDataLen, uint16_t *backLen) {
+
     MIFARE_Status_t status = MIFARE_ERR;
     uint8_t irqEn = 0x00;
     uint8_t waitIRq = 0x00;
@@ -217,14 +226,15 @@ MifareToPICC(MFRC522Driver *mfrc522p, uint8_t command, uint8_t *sendData, uint8_
         if (!(MFRC522ReadRegister(mfrc522p, MifareREG_ERROR) & 0x1B)) {
             status = MIFARE_OK;
             if (n & irqEn & 0x01) {
+                printf("MIFARE_NOTAGERR\n");
                 status = MIFARE_NOTAGERR;
             }
 
             if (command == PCD_TRANSCEIVE) {
                 n = MFRC522ReadRegister(mfrc522p, MifareREG_FIFO_LEVEL);
-                printf("n2: %x\n", n);
+//                printf("n2: %x\n", n);
                 lastBits = MFRC522ReadRegister(mfrc522p, MifareREG_CONTROL) & 0x07;
-                printf("n3: %x\n", lastBits);
+//                printf("n3: %x\n", lastBits);
                 if (lastBits) {
                     *backLen = (n - 1) * 8 + lastBits;
                 } else {
@@ -239,6 +249,7 @@ MifareToPICC(MFRC522Driver *mfrc522p, uint8_t command, uint8_t *sendData, uint8_
                 }
 
                 if (n <= backDataLen) {
+                    printf("reading data\n");
                     //Reading the received data in FIFO
                     for (i = 0; i < n; i++) {
                         backData[i] = MFRC522ReadRegister(mfrc522p, MifareREG_FIFO_DATA);
@@ -253,6 +264,7 @@ MifareToPICC(MFRC522Driver *mfrc522p, uint8_t command, uint8_t *sendData, uint8_
         }
     }
 
+    printf("MifareToPICC status: %x\n", status);
     return status;
 }
 
@@ -400,11 +412,18 @@ MIFARE_Status_t MifareRequest(MFRC522Driver *mfrc522p, uint8_t reqMode, uint8_t 
     uint16_t backBits;          //The received data bits
     uint8_t request[1];
 
+    MFRC522WriteRegister(mfrc522p, MifareREG_COMMAND, PCD_IDLE); // Stop any command
+    MFRC522WriteRegister(mfrc522p, MifareREG_COMM_IRQ, 0x7F);   // Clear all seven interrupt request bits
+    MFRC522SetBitMask(mfrc522p, MifareREG_FIFO_LEVEL, 0x80);        // FlushBuffer = 1, FIFO initialization
+
+
     MFRC522WriteRegister(mfrc522p, MifareREG_BIT_FRAMING, 0x07);        //TxLastBists = BitFramingReg[2..0] ???
 
     request[0] = reqMode;
     status = MifareToPICC(mfrc522p, PCD_TRANSCEIVE, request, 1, tagType, tagTypeLen, &backBits);
 
+//    printf("status: %x\n", status);
+//    printf("backBits: %x\n", backBits);
     if ((status != MIFARE_OK) || (backBits != 0x10)) {
         status = MIFARE_ERR;
     }
@@ -618,6 +637,7 @@ MIFARE_Status_t MifareCheck(MFRC522Driver *mfrc522p, struct MifareUID *id) {
 
     status = MifareRequest(mfrc522p, PICC_REQALL, tagType, 2);
     if (status == MIFARE_OK) {
+        printf("Card detected: %x %x\n", tagType[0], tagType[1]);
         //Card detected
         //Anti-collision, return card serial number 4 bytes
         status = MifareAnticoll(mfrc522p, id);
@@ -646,10 +666,11 @@ void MFRC522Selftest(MFRC522Driver *mfrc522p) {
     MFRC522Reset(mfrc522p);
 
     uint8_t reg = MifareREG_COMMAND;
-    uint8_t data[25] = {0};
+    uint8_t data[25] = {0x00};
     // flush the FIFO buffer
     MFRC522WriteRegister(mfrc522p, MifareREG_FIFO_LEVEL, 0x80);
-    MFRC522WriteRegister(mfrc522p, MifareREG_COMMAND, 0x01);
+
+//    MFRC522WriteRegister(mfrc522p, MifareREG_COMMAND, 0x01);
 
     // write 25 empty bytes to fifo
 //    gpio_put(CS, 0);
@@ -677,15 +698,16 @@ void MFRC522Selftest(MFRC522Driver *mfrc522p) {
     // wrtie 00 to Fifo
     MFRC522WriteRegister(mfrc522p, MifareREG_FIFO_DATA, 0x00);
 
-
+    //  Start the self test with the CalcCRC command.
     MFRC522WriteRegister(mfrc522p, MifareREG_COMMAND, PCD_CALCCRC);
+
 
 
     // wait until calculation is done
     uint8_t level = 0;
     do {
         level = MFRC522ReadRegister(mfrc522p, MifareREG_FIFO_LEVEL);
-    } while (level <= 64);
+    } while (level < 64);
 
     // Stop calculating CRC for new content in the FIFO.
     MFRC522WriteRegister(mfrc522p, MifareREG_COMMAND, 0x00);
@@ -696,16 +718,16 @@ void MFRC522Selftest(MFRC522Driver *mfrc522p) {
 //        n = MFRC522ReadRegister(mfrc522p, MifareREG_FIFO_DATA);
 //        printf("%x \n", n);
     uint8_t tx_data[2];
-    uint8_t rx_data[64];
+    uint8_t rx_data[65];
     tx_data[0] = ((MifareREG_FIFO_DATA << 1) & 0x7E) | 0x80;
     tx_data[1] = 0xff;
     gpio_put(CS, 0);
 //    spi_write_blocking(SPI_PORT, tx_data, 2);
-    spi_read_blocking(SPI_PORT, tx_data[0], rx_data, 64);
+    spi_read_blocking(SPI_PORT, tx_data[0], rx_data, 65);
     while (spi_is_busy(SPI_PORT)) {}
     gpio_put(CS, 1);
 
-    for (int i = 0; i < 64; ++i) {
+    for (int i = 1; i < 65; ++i) {
         printf("%x \n", rx_data[i]);
     }
 

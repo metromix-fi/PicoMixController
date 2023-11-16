@@ -47,19 +47,6 @@ int main() {
     return 0;
 }
 
-void setup_gpios(void) {
-    // Configure GPIO pins for the rotary encoder as inputs
-    gpio_init(ROTARY_A);
-    gpio_set_dir(ROTARY_A, GPIO_IN);
-    gpio_pull_up(ROTARY_A);
-    gpio_set_irq_enabled_with_callback(ROTARY_A, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &handleEncoderA);
-
-    gpio_init(ROTARY_B);
-    gpio_set_dir(ROTARY_B, GPIO_IN);
-    gpio_pull_up(ROTARY_B);
-    //gpio_set_irq_enabled_with_callback(ROTARY_B, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &handleEncoderB);
-}
-
 void displayNumber(ssd1306_t *disp, int value) {
     // Display the current number on the OLED screen
     char buf[8];

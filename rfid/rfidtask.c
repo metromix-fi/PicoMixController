@@ -207,27 +207,31 @@ _Noreturn void rfid_task(void *pvParameters) {
     MFRC522Start(&mfrc522p, NULL);
 
     struct MifareUID card_id;
-    char tag_type[] = "00";
+    char tag_type[2] = {0x00};
 
 //    MIFARE_Status_t status = MifareRequest(&mfrc522p, PICC_REQIDL, &tag_type, 2);
 
     while (1) {
-        MFRC522Selftest(&mfrc522p);
-        vTaskDelay(1000);
+//        MFRC522Selftest(&mfrc522p);
+//        vTaskDelay(1000);
 
-//        MIFARE_Status_t status = MifareCheck(&mfrc522p, &card_id);
-////        MIFARE_Status_t status = MifareRequest(&mfrc522p, PICC_REQIDL, (uint8_t *) &tag_type, 2);
-//        if (status == MI_OK) {
-//            printf("Card detected: %x, %x\n", tag_type[0], tag_type[1]);
-//        } else if (status == MI_NOTAGERR) {
-//            printf("No card detected\n");
-//        } else { // MI_ERR
-//            printf("Error: %d\n", status);
-//            printf("Tag type: %x, %x\n", tag_type[0], tag_type[1]);
-//            printf("Card: %x, %x\n", card_id.size, card_id.bytes);
-//        }
-//        xQueueSendToBack(globalStruct.rfidQueue, &tag_type, portMAX_DELAY);
-//
-//        vTaskDelay(2000);
+        MIFARE_Status_t status = MifareCheck(&mfrc522p, &card_id);
+//        MIFARE_Status_t status = MifareRequest(&mfrc522p, PICC_REQIDL, (uint8_t *) &tag_type, 2);
+        if (status == MI_OK) {
+            printf("\n\nrfidtask.c: MI_OK\n");
+            printf("Card detected: %x, %x\n", tag_type[0], tag_type[1]);
+            printf("Card: %x, %x\n\n", card_id.size, card_id.bytes);
+
+        } else if (status == MI_NOTAGERR) {
+            printf("\n\nrfidtask.c: MI_NOTAGERR");
+            printf("No card detected\n\n");
+        } else { // MI_ERR
+            printf("\n\nrfidtask.c: Error: %d\n", status);
+            printf("Tag type: %x, %x\n", tag_type[0], tag_type[1]);
+            printf("Card: %x, %x\n\n", card_id.size, card_id.bytes);
+        }
+        xQueueSendToBack(globalStruct.rfidQueue, &tag_type, portMAX_DELAY);
+
+        vTaskDelay(4000);
     }
 }
