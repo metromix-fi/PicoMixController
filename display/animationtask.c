@@ -68,10 +68,12 @@ _Noreturn void animationTask(void *param) {
 
     int rotary_input = 0;
     uint8_t state = 0;
+
+    uint8_t rfid_state[2];
     for (;;) {
         state = state + rotary_input;
 //        uint8_t i = (state / 8) % 3;
-        displayNumber(&disp, state);
+        displayNumber(&disp, rotary_input);
 //        display_img(&disp);
 //        ssd1306_draw_string(&disp, 8, 24, 2, words[i]);
         ssd1306_show(&disp);
@@ -79,5 +81,6 @@ _Noreturn void animationTask(void *param) {
 //        ssd1306_clear(&disp);W
 
         xQueueReceive(globalStruct.rotaryEncoderQueue, &rotary_input, portMAX_DELAY);
+//        xQueueReceive(globalStruct.rfidQueue, &rfid_state, portMAX_DELAY);
     }
 }

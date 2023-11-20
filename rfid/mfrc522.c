@@ -886,8 +886,6 @@ MIFARE_Status_t MifareCheck(MFRC522Driver *mfrc522p, struct MifareUID *id) {
         //Card detected
         //Anti-collision, return card serial number 4 bytes
         status = MifareAnticoll(mfrc522p, id);
-
-
 //        Uid uid;
 //
 //        status = PICC_SELECT(mfrc522p, &uid);

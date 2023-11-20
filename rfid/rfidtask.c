@@ -251,6 +251,6 @@ _Noreturn void rfid_task(void *pvParameters) {
         }
         xQueueSendToBack(globalStruct.rfidQueue, &tag_type, portMAX_DELAY);
 
-        vTaskDelay(4000);
+        vTaskDelay(2000);
     }
 }
