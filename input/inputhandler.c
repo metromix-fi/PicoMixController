@@ -79,7 +79,7 @@ void input_isr(uint gpio, uint32_t events) {
     static unsigned char lastBState = 0;
     static unsigned char lastAState = 0;
 
-    int8_t value = 0;
+    InputEvent value = 0;
 
     // printf("ISR triggered on GPIO %d\n", gpio);
 
@@ -89,12 +89,12 @@ void input_isr(uint gpio, uint32_t events) {
         if (currentAState != lastAState) { // If there is a change in the state
             if (lastBState == 0 && currentAState == GPIO_IRQ_EDGE_RISE) {
                 /* Send a message to the queue */
-                value = 1;
+                value = CW_ROTATION;
                 xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
                 // printf("Clockwise Rotation. Value: %d\n", displayedNumber);
             } else if (lastBState == GPIO_IRQ_EDGE_RISE && currentAState == GPIO_IRQ_EDGE_RISE) {
                 /* Send a message to the queue */
-                value = -1;
+                value = CCW_ROTATION;
                 xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
                 // printf("Counter-clockwise Rotation. Value: %d\n", displayedNumber);
             }
@@ -106,12 +106,12 @@ void input_isr(uint gpio, uint32_t events) {
         if (currentBState != lastBState) { // If there is a change in the state
             if (lastAState == 0 && currentBState == GPIO_IRQ_EDGE_RISE) {
                 /* Send a message to the queue */
-                value = -1;
+                value = CCW_ROTATION;
                 xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
 
             } else if (lastAState == GPIO_IRQ_EDGE_RISE && currentBState == GPIO_IRQ_EDGE_RISE) {
                 /* Send a message to the queue */
-                value = 1;
+                value = CW_ROTATION;
                 xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
             }
         }
@@ -119,9 +119,9 @@ void input_isr(uint gpio, uint32_t events) {
     } else { // ROTARY_PUSH
         // printf("Push button pressed\n");
         disable_rotary_push_interrupt();
-        value = 10;
+        value = PUSH;
         xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
-        add_alarm_in_ms(30, enable_rotary_push_interrupt, NULL, false);
+        add_alarm_in_ms(50, enable_rotary_push_interrupt, NULL, false);
     }
 
     //enable_interrupts();

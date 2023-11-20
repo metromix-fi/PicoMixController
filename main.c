@@ -38,15 +38,15 @@ int main() {
     printf("Creating tasks...\n");
 
     // Networking
-    TaskHandle_t networking_task_handle = NULL;
-    xTaskCreate(
-                networkTask,
-                "networking task",
-                1024,
-                NULL,
-                tskIDLE_PRIORITY + 1,
-                &networking_task_handle
-            );
+//    TaskHandle_t networking_task_handle = NULL;
+//    xTaskCreate(
+//                networkTask,
+//                "networking task",
+//                1024,
+//                NULL,
+//                tskIDLE_PRIORITY + 1,
+//                &networking_task_handle
+//            );
 
     // Display
     TaskHandle_t animation_task_handle = NULL;
@@ -81,15 +81,16 @@ int main() {
 //    );
 
 // Time of Flight
-    TaskHandle_t tof_task_handle = NULL;
-    xTaskCreate(
-            tof_task,
-            "tof task",
-            1024,
-            NULL,
-            tskIDLE_PRIORITY + 2,
-            &tof_task_handle
-    );
+//    TaskHandle_t tof_task_handle = NULL;
+//    xTaskCreate(
+//            tof_task,
+//            "tof task",
+//            1024,
+//            NULL,
+//            tskIDLE_PRIORITY + 2,
+//            &tof_task_handle
+//    );
+
     vTaskStartScheduler();
 
     return 0;

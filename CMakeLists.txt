@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.13)
 
-# initialize the SDK based on PICO_SDK_PATH
-# note: this must happen before project()
-include(pico_sdk_import.cmake)
-
 set(PICO_BOARD pico_w)
 set(WIFI_SSID $ENV{WIFI_SSID})
 set(WIFI_PASSWORD $ENV{WIFI_PASSWORD})
+
+# initialize the SDK based on PICO_SDK_PATH
+# note: this must happen before project()
+include(pico_sdk_import.cmake)
 
 project(metromix)
 
@@ -33,7 +33,6 @@ target_include_directories(FreeRTOS PUBLIC
 # Time of Flight lib
 include(${PROJECT_SOURCE_DIR}/VL53L1X-C-API-Pico/library/import.cmake)
 
-
 # Rest of project
 add_executable(metromix
 		main.c
@@ -57,6 +56,8 @@ add_executable(metromix
 		rfid/rfid-spi.h
 		toftask/toftask.c
 		toftask/toftask.h
+		utils/helper.c
+		utils/helper.h
 )
 
 target_link_libraries(metromix
@@ -73,6 +74,7 @@ target_link_libraries(metromix
 #		pico_cyw43_arch_lwip_threadsafe_background
 #		picow_tls_client_poll
 )
+
 target_include_directories(metromix PUBLIC
 		${CMAKE_CURRENT_LIST_DIR}
 		networking/include
@@ -91,6 +93,6 @@ pico_enable_stdio_uart(metromix 1)
 pico_add_extra_outputs(metromix)
 
 # copy project to pico
-#add_custom_command(TARGET metromix)
+#add_custom_command(TARGET metromix
 
 #POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/metromix.uf2 /run/media/jesse/RPI-RP2 )

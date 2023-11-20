@@ -10,4 +10,10 @@ void setup_input_gpios(void);
 
 _Noreturn void input_handler_task(void *pvParameters);
 
+typedef enum InputEvent {
+    CW_ROTATION = 0,
+    CCW_ROTATION,
+    PUSH,
+} InputEvent;
+
 #endif //METROMIX_INPUTHANDLER_H

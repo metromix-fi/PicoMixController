@@ -13,6 +13,7 @@ typedef struct {
     QueueHandle_t rotaryEncoderQueue;
     QueueHandle_t rfidQueue;
     QueueHandle_t tofQueue;
+    QueueHandle_t pouringProgressQueue;
 } GlobalStruct_t;
 
 extern GlobalStruct_t globalStruct;
