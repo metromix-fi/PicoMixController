@@ -2,3 +2,5 @@ cmake-build-debug/
 .idea/
 build/
 .env
+ VL53L1X-C-API-Pico/examples/
+VL53L1X-C-API-Pico/.idea

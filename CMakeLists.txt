@@ -30,6 +30,9 @@ target_include_directories(FreeRTOS PUBLIC
         FreeRTOS-Kernel/portable/GCC/ARM_CM0
 )
 
+# Time of Flight lib
+include(${PROJECT_SOURCE_DIR}/VL53L1X-C-API-Pico/library/import.cmake)
+
 
 # Rest of project
 add_executable(metromix
@@ -52,6 +55,8 @@ add_executable(metromix
 		rfid/mfrc522.h
 		rfid/rfid-spi.c
 		rfid/rfid-spi.h
+		toftask/toftask.c
+		toftask/toftask.h
 )
 
 target_link_libraries(metromix
@@ -63,6 +68,7 @@ target_link_libraries(metromix
 		pico_mbedtls
 		pico_cyw43_arch#_lwip_poll
 		pico_cyw43_arch_lwip_poll
+		VL53L1X_pico_api
 #		picow_tls_verify_background
 #		pico_cyw43_arch_lwip_threadsafe_background
 #		picow_tls_client_poll
@@ -76,8 +82,6 @@ target_compile_definitions(metromix PRIVATE
 		WIFI_SSID="${WIFI_SSID}"
 		WIFI_PASSWORD="${WIFI_PASSWORD}"
 )
-
-pico_add_extra_outputs(metromix)
 
 
 pico_enable_stdio_usb(metromix 0)
