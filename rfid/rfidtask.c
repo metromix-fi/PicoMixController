@@ -20,7 +20,7 @@
 #define CS 17
 #define SCKL 18
 #define MOSI 19
-#define RESET 10 // TODO: change
+//#define RESET 10 // TODO: change (conflict with rotary encoder)
 
 
 #define SPI_PORT spi0
@@ -61,9 +61,9 @@ void setup_rfid_gpios(void) {
     gpio_put(CS, 1); // Set high for inactive
 
     // Initialize the reset pin, if used
-    gpio_init(RESET);
-    gpio_set_dir(RESET, GPIO_OUT);
-    gpio_put(RESET, 1);  // Set high assuming active-low reset
+//    gpio_init(RESET);
+//    gpio_set_dir(RESET, GPIO_OUT);
+//    gpio_put(RESET, 1);  // Set high assuming active-low reset
 
      spi_init(SPI_PORT, 9600);
 }

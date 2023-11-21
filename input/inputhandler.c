@@ -29,8 +29,9 @@ void input_isr(uint gpio, uint32_t events);
 
 static void enable_interrupts() {
     // Activate the interrupts
-    gpio_set_irq_enabled_with_callback(ROTARY_A, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &input_isr);
-    gpio_set_irq_enabled(ROTARY_B, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
+    gpio_set_irq_enabled_with_callback(ROTARY_A, GPIO_IRQ_EDGE_RISE, true, &input_isr);
+//    gpio_set_irq_enabled_with_callback(ROTARY_A, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true, &input_isr);
+//    gpio_set_irq_enabled(ROTARY_B, GPIO_IRQ_EDGE_FALL | GPIO_IRQ_EDGE_RISE, true);
     gpio_set_irq_enabled(ROTARY_PUSH, GPIO_IRQ_EDGE_RISE, true);
 }
 
@@ -81,48 +82,65 @@ void input_isr(uint gpio, uint32_t events) {
 
     InputEvent value = 0;
 
+    BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
+
     // printf("ISR triggered on GPIO %d\n", gpio);
 
+    // Low Resolution Rotary Encoder
     if (gpio == ROTARY_A) {
-        unsigned char currentAState = events & GPIO_IRQ_EDGE_RISE;
-        // printf("Current A State: %d\n", currentAState);
-        if (currentAState != lastAState) { // If there is a change in the state
-            if (lastBState == 0 && currentAState == GPIO_IRQ_EDGE_RISE) {
-                /* Send a message to the queue */
-                value = CW_ROTATION;
-                xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
-                // printf("Clockwise Rotation. Value: %d\n", displayedNumber);
-            } else if (lastBState == GPIO_IRQ_EDGE_RISE && currentAState == GPIO_IRQ_EDGE_RISE) {
-                /* Send a message to the queue */
-                value = CCW_ROTATION;
-                xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
-                // printf("Counter-clockwise Rotation. Value: %d\n", displayedNumber);
-            }
+        if(gpio_get(ROTARY_B)) {
+            value = CCW_ROTATION;
+            xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, &pxHigherPriorityTaskWoken);
+        } else if(!gpio_get(ROTARY_B)) {
+            value = CW_ROTATION;
+            xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, &pxHigherPriorityTaskWoken);
         }
-        lastAState = currentAState;
-    } else if (gpio == ROTARY_B) {
-        unsigned char currentBState = events & GPIO_IRQ_EDGE_RISE;
-        // printf("Current B State: %d\n", currentBState);
-        if (currentBState != lastBState) { // If there is a change in the state
-            if (lastAState == 0 && currentBState == GPIO_IRQ_EDGE_RISE) {
-                /* Send a message to the queue */
-                value = CCW_ROTATION;
-                xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
+    }
 
-            } else if (lastAState == GPIO_IRQ_EDGE_RISE && currentBState == GPIO_IRQ_EDGE_RISE) {
-                /* Send a message to the queue */
-                value = CW_ROTATION;
-                xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
-            }
-        }
-        lastBState = currentBState;
-    } else { // ROTARY_PUSH
+// High Resolution Rotary Encoder
+//    if (gpio == ROTARY_A) {
+//        unsigned char currentAState = events & GPIO_IRQ_EDGE_RISE;
+//        // printf("Current A State: %d\n", currentAState);
+//        if (currentAState != lastAState) { // If there is a change in the state
+//            if (lastBState == 0 && currentAState == GPIO_IRQ_EDGE_RISE) {
+//                /* Send a message to the queue */
+//                value = CW_ROTATION;
+//                xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
+//                // printf("Clockwise Rotation. Value: %d\n", displayedNumber);
+//            } else if (lastBState == GPIO_IRQ_EDGE_RISE && currentAState == GPIO_IRQ_EDGE_RISE) {
+//                /* Send a message to the queue */
+//                value = CCW_ROTATION;
+//                xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
+//                // printf("Counter-clockwise Rotation. Value: %d\n", displayedNumber);
+//            }
+//        }
+//        lastAState = currentAState;
+//    } else if (gpio == ROTARY_B) {
+//        unsigned char currentBState = events & GPIO_IRQ_EDGE_RISE;
+//        // printf("Current B State: %d\n", currentBState);
+//        if (currentBState != lastBState) { // If there is a change in the state
+//            if (lastAState == 0 && currentBState == GPIO_IRQ_EDGE_RISE) {
+//                /* Send a message to the queue */
+//                value = CCW_ROTATION;
+//                xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
+//
+//            } else if (lastAState == GPIO_IRQ_EDGE_RISE && currentBState == GPIO_IRQ_EDGE_RISE) {
+//                /* Send a message to the queue */
+//                value = CW_ROTATION;
+//                xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
+//            }
+//        }
+//        lastBState = currentBState;
+//    }
+
+    else { // ROTARY_PUSH
         // printf("Push button pressed\n");
         disable_rotary_push_interrupt();
         value = PUSH;
-        xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, NULL);
+        xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, &pxHigherPriorityTaskWoken);
         add_alarm_in_ms(50, enable_rotary_push_interrupt, NULL, false);
     }
 
+    portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
     //enable_interrupts();
 }

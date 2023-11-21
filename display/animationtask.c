@@ -25,6 +25,8 @@
 #include "queue.h"
 #include "utils/GlobalState.h"
 #include "utils/helper.h"
+#include "rfid/rfidtask.h"
+#include "toftask/toftask.h"
 
 
 #define SLEEPTIME 25
@@ -56,6 +58,16 @@ void setup_display_gpios(void) {
 
 // used as main application loop
 _Noreturn void animationTask(void *param) {
+
+    // ALL INITS
+    printf("configuring pins...\n");
+    initializeGlobalStruct();
+    setup_display_gpios();
+    setup_input_gpios();
+//    setup_rfid_gpios();
+//    setup_tof();
+
+
     const int amount_drinks = 2;
     const char *words[] = {"Vodka Cola", "Rum Cola"};
     const int liquid1[] = {DRINK_1, DRINK_2};
@@ -65,6 +77,7 @@ _Noreturn void animationTask(void *param) {
     disp.external_vcc = false;
     ssd1306_init(&disp, 128, 64, 0x3C, i2c1);
     ssd1306_clear(&disp);
+    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Hello World!");
     ssd1306_show(&disp);
 
     printf("ANIMATION!\n");
@@ -89,7 +102,7 @@ _Noreturn void animationTask(void *param) {
     uint8_t last_drink = 0;
 
     // TODO: refactor without goto?
-    goto skip;
+//    goto skip;
     for (;;) {
 
         // get input
@@ -104,10 +117,10 @@ _Noreturn void animationTask(void *param) {
 
                 switch (rotary_input) {
                     case CW_ROTATION:
-                        drink = (drink + 1) % amount_drinks;
+                        drink = mod(drink + 1, amount_drinks);
                         break;
                     case CCW_ROTATION:
-                        drink = (drink - 1) % amount_drinks;
+                        drink = mod(drink - 1, amount_drinks);
                         break;
                     case PUSH:
                         // confirm drink and change state
@@ -168,6 +181,7 @@ _Noreturn void animationTask(void *param) {
                 ssd1306_clear(&disp);
                 ssd1306_draw_string_with_font(&disp, 8, 8, 1, acme_font, "Mixture");
                 draw_number(&disp, 8, 24, 1, config.mixture[0]);
+//                ssd1306
                 draw_number(&disp, 8, 48, 1, config.mixture[1]);
                 ssd1306_show(&disp);
 

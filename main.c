@@ -26,13 +26,13 @@
 int main() {
     printf("Initializing...\n");
     stdio_init_all();
-    initializeGlobalStruct();
 
-    printf("configuring pins...\n");
-    setup_display_gpios();
-    setup_input_gpios();
-    setup_rfid_gpios();
-    setup_tof();
+    // inits are in animation task now
+//    printf("configuring pins...\n");
+//    setup_display_gpios();
+//    setup_input_gpios();
+//    setup_rfid_gpios();
+//    setup_tof();
 
 
     printf("Creating tasks...\n");
@@ -54,7 +54,7 @@ int main() {
                 "animationTask",
                 1024,
                 NULL,
-                tskIDLE_PRIORITY + 3,
+                tskIDLE_PRIORITY + 1,
                 &animation_task_handle
                 );
 
