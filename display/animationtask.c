@@ -101,12 +101,25 @@ _Noreturn void animationTask(void *param) {
     uint8_t drink = 0;
     uint8_t last_drink = 0;
 
+    // idle counter
+    int idle_counter = 0;
+
     // TODO: refactor without goto?
-//    goto skip;
+    TickType_t ticks_to_wait = 10000;
+    goto skip;
     for (;;) {
 
         // get input
-        xQueueReceive(globalStruct.rotaryEncoderQueue, &rotary_input, portMAX_DELAY);
+        if(xQueueReceive(globalStruct.rotaryEncoderQueue, &rotary_input, ticks_to_wait) == pdFALSE) {
+            state = IDLE;
+            ticks_to_wait = 64;
+        } else {
+            if (idle_counter != 0) {
+                idle_counter = 0;
+                state = DRINK_SELECT;
+                ticks_to_wait = 30000;
+            }
+        }
 
         // Break out of nested switch after state change with goto
         skip:
@@ -216,12 +229,29 @@ _Noreturn void animationTask(void *param) {
                 ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Pouring");
                 ssd1306_show(&disp);
 
+                // TODO:Show timer progress
+
+                state = DONE;
+
                 break;
             case DONE:
                 printf("DONE\n");
+
+                ssd1306_clear(&disp);
+                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Done");
+                ssd1306_show(&disp);
+
                 break;
             case IDLE:
                 printf("IDLE\n");
+
+                // TODO: Play animation
+                idle_counter++;
+                ssd1306_clear(&disp);
+                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Idle");
+                draw_number(&disp, 8, 48, 1, idle_counter);
+                ssd1306_show(&disp);
+
                 break;
         }
 //        uint8_t i = (state / 8) % 3;
