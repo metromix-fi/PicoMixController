@@ -219,28 +219,19 @@ _Noreturn void animationTask(void *param) {
                 ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Authenticate RFID");
                 ssd1306_show(&disp);
 
-                for (int i = 0; i < 10; ++i) {
-                    // Notify RFID_Task to start measuring
-                    xTaskNotifyGive(globalStruct.rfidTaskHandle);
+                bool auth = false;
+                xTaskNotifyGive(globalStruct.networkTaskHandle);
+                xQueueReceive(globalStruct.authenticationQueue, &auth, portMAX_DELAY);
 
-                    // TODO: use queue from wifi and not rfid directly (rfid -> wifi(get auth info from server) -> animation)
-                    if (xQueueReceive(globalStruct.rfidQueue, &rfid_state, portMAX_DELAY)) {
-                        if (rfid_state.size == 0) {
-                            vTaskDelay(1000);
-                            continue;
-                        } else {
-                            printf("Success!\n");
-                            printf("rfid_state: %x, %04X\n", rfid_state.size, rfid_state.bytes);
-                            state = POURING;
-                            needs_update = true;
-                        }
-                    }
-                }
+                printf("auth: %d\n", auth);
 
-                if (!needs_update) {
+                if (!auth) {
                     state = ERROR;
+                } else {
+                    state = POURING;
                 }
 
+                needs_update = true;
                 break;
             case ERROR:
                 printf("ERROR\n");

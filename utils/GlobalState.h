@@ -12,10 +12,12 @@
 typedef struct {
     QueueHandle_t rotaryEncoderQueue;
     QueueHandle_t rfidQueue;
+    QueueHandle_t authenticationQueue;
     QueueHandle_t tofQueue;
     QueueHandle_t pouringProgressQueue;
     TaskHandle_t tofTaskHandle;
     TaskHandle_t rfidTaskHandle;
+    TaskHandle_t networkTaskHandle;
 } GlobalStruct_t;
 
 extern GlobalStruct_t globalStruct;

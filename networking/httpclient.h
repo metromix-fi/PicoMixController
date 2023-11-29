@@ -8,6 +8,8 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+int network_setup();
+
 _Noreturn void networkTask(void *param);
 
 #endif //METROMIX_HTTPCLIENT_H

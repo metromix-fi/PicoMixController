@@ -85,6 +85,10 @@ target_compile_definitions(metromix PRIVATE
 		WIFI_PASSWORD="${WIFI_PASSWORD}"
 )
 
+# disable alarm pool (timer to use in rtos?)
+#target_compile_definitions(metromix INTERFACE
+#		PICO_TIME_DEFAULT_ALARM_POOL_DISABLED=1
+#)
 
 pico_enable_stdio_usb(metromix 0)
 pico_enable_stdio_uart(metromix 1)

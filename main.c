@@ -22,6 +22,8 @@
 #include "rfid/rfidtask.h"
 #include "toftask/toftask.h"
 
+#define PICO_TIME_DEFAULT_ALARM_POOL_DISABLED = 1;
+
 
 int main() {
     printf("Initializing...\n");
@@ -29,6 +31,7 @@ int main() {
 
     // inits are in animation task now
 //    printf("configuring pins...\n");
+    network_setup();
     setup_display_gpios();
     setup_input_gpios();
     setup_rfid_gpios();
@@ -38,15 +41,16 @@ int main() {
     printf("Creating tasks...\n");
 
     // Networking
-//    TaskHandle_t networking_task_handle = NULL;
-//    xTaskCreate(
-//                networkTask,
-//                "networking task",
-//                1024,
-//                NULL,
-//                tskIDLE_PRIORITY + 1,
-//                &networking_task_handle
-//            );
+    TaskHandle_t networking_task_handle = NULL;
+    xTaskCreate(
+                networkTask,
+                "networking task",
+                1024,
+                NULL,
+                tskIDLE_PRIORITY + 1,
+                &networking_task_handle
+            );
+    globalStruct.networkTaskHandle = networking_task_handle;
 
     // Display
     TaskHandle_t animation_task_handle = NULL;
