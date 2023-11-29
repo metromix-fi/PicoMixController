@@ -15,6 +15,7 @@
 #include "task.h"
 
 #include "utils/GlobalState.h"
+#include "timers.h"
 
 // Define GPIO pins for the rotary encoder
 #define ROTARY_A 10
@@ -52,6 +53,11 @@ static int64_t enable_rotary_push_interrupt() {
     // Enable the interrupt
     gpio_set_irq_enabled(ROTARY_PUSH, GPIO_IRQ_EDGE_RISE, true);
     return 0;
+}
+
+static void enable_rotary_push_interrupt_rtos() {
+    // Enable the interrupt
+    gpio_set_irq_enabled(ROTARY_PUSH, GPIO_IRQ_EDGE_RISE, true);
 }
 
 
@@ -138,7 +144,16 @@ void input_isr(uint gpio, uint32_t events) {
         disable_rotary_push_interrupt();
         value = PUSH;
         xQueueSendFromISR(globalStruct.rotaryEncoderQueue, &value, &pxHigherPriorityTaskWoken);
-        add_alarm_in_ms(50, enable_rotary_push_interrupt, NULL, false);
+
+//        add_alarm_in_ms(50, enable_rotary_push_interrupt, NULL, false);
+        TimerHandle_t xTimer = xTimerCreate(
+                "RotaryPushTimer",                  // Name of the timer
+                pdMS_TO_TICKS(50),      // Timer period in ticks (1000 ms in this example)
+                pdFALSE,                  // uxAutoReload pdFALSE for one-shot, pdTRUE for periodic
+                (void *) 0,               // Optional identifier
+                enable_rotary_push_interrupt_rtos            // Callback function
+        );
+        xTimerStart(xTimer, 0);
     }
 
     portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
