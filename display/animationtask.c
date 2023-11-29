@@ -306,8 +306,11 @@ _Noreturn void animationTask(void *param) {
                 ssd1306_clear(&disp);
                 ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Done");
                 ssd1306_show(&disp);
-
-                break;
+                
+                vTaskDelay(5000);
+                state = DRINK_SELECT;
+                goto skip;
+                
             case IDLE:
 //                printf("IDLE\n");
 
