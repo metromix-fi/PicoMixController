@@ -62,8 +62,8 @@ _Noreturn void animationTask(void *param) {
     // ALL INITS
     printf("configuring pins...\n");
     initializeGlobalStruct();
-    setup_display_gpios();
-    setup_input_gpios();
+//    setup_display_gpios();
+//    setup_input_gpios();
 //    setup_rfid_gpios();
 //    setup_tof();
 
@@ -86,7 +86,7 @@ _Noreturn void animationTask(void *param) {
 
     // Input
     InputEvent rotary_input = -1;
-    uint8_t rfid_state[2];
+    MifareUID rfid_state;
 
     // State
     MenuState state = DRINK_SELECT;
@@ -103,6 +103,9 @@ _Noreturn void animationTask(void *param) {
 
     // idle counter
     int idle_counter = 0;
+
+    // tof distance
+    uint16_t distance = 0;
 
     // TODO: refactor without goto?
     TickType_t ticks_to_wait = 10000;
@@ -121,12 +124,12 @@ _Noreturn void animationTask(void *param) {
             }
         }
 
-        // Break out of nested switch after state change with goto
+        // Break out of nested switch after state change with goto (show next display without waiting for input)
         skip:
         // different actions for different states
         switch (state) {
             case DRINK_SELECT:
-                printf("DRINK_SELECT\n");
+//                printf("DRINK_SELECT\n");
 
                 switch (rotary_input) {
                     case CW_ROTATION:
@@ -149,7 +152,7 @@ _Noreturn void animationTask(void *param) {
                 ssd1306_show(&disp);
                 break;
             case SIZE_SELECT:
-                printf("SIZE_SELECT\n");
+//                printf("SIZE_SELECT\n");
                 switch (rotary_input) {
                     case CW_ROTATION:
                         config.size = (config.size + 1) % 3;
@@ -173,7 +176,7 @@ _Noreturn void animationTask(void *param) {
 
                 break;
             case MIXTURE_SELECT:
-                printf("MIXTURE_SELECT\n");
+//                printf("MIXTURE_SELECT\n");
                 switch (rotary_input) {
                     case CW_ROTATION:
                         config.mixture[0] = clamp(config.mixture[0] + 1, 0, 100);
@@ -201,18 +204,31 @@ _Noreturn void animationTask(void *param) {
                 break;
             case AUTHENTICATION:
                 printf("AUTHENTICATION\n");
+
+
                 ssd1306_clear(&disp);
                 ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Authenticate RFID");
                 ssd1306_show(&disp);
-                if (xQueueReceive(globalStruct.rfidQueue, &rfid_state, 10000)) {
-                    if (rfid_state[0] == 0x00) {
-                        state = ERROR;
-                    } else {
-                        state = POURING;
+
+                for (int i = 0; i < 10; ++i) {
+                    // Notify RFID_Task to start measuring
+                    xTaskNotifyGive(globalStruct.rfidTaskHandle);
+
+                    // TODO: use queue from wifi and not rfid directly (rfid -> wifi(get auth info from server) -> animation)
+                    if (xQueueReceive(globalStruct.rfidQueue, &rfid_state, portMAX_DELAY)) {
+                        if (rfid_state.size == 0) {
+                            vTaskDelay(1000);
+                            continue;
+                        } else {
+                            printf("Success!\n");
+                            printf("rfid_state: %x, %04X\n", rfid_state.size, rfid_state.bytes);
+                            state = POURING;
+                            goto skip;
+                        }
                     }
-                } else {
-                    state = ERROR;
                 }
+                state = ERROR;
+
                 break;
             case ERROR:
                 printf("ERROR\n");
@@ -225,13 +241,63 @@ _Noreturn void animationTask(void *param) {
                 break;
             case POURING:
                 printf("POURING\n");
+
+                // Notify ToF_Task to start measuring
+                xTaskNotifyGive(globalStruct.tofTaskHandle);
+
+                xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
+                if (distance > MAX_CUP_DISTANCE) {
+                    state = NO_CUP;
+                    goto skip;
+                }
+
                 ssd1306_clear(&disp);
                 ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Pouring");
                 ssd1306_show(&disp);
 
                 // TODO:Show timer progress
 
+                for (int i = 0; i < 10; ++i) {
+                    // Notify ToF_Task to start measuring
+                    xTaskNotifyGive(globalStruct.tofTaskHandle);
+
+                    xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
+                    if (distance > MAX_CUP_DISTANCE) {
+                        state = NO_CUP;
+                        goto skip;
+                    } else {
+                        ssd1306_clear(&disp);
+                        ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Pouring");
+                        draw_number(&disp, 8, 48, 1, 10 - i);
+                        ssd1306_show(&disp);
+                        vTaskDelay(DISTANCE_MEASURE_DELAY);
+                    }
+                }
+
                 state = DONE;
+                goto skip;
+
+            case NO_CUP:
+                printf("NO_CUP\n");
+
+                ssd1306_clear(&disp);
+                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Place Cup");
+                ssd1306_show(&disp);
+
+                for (int i = 0; i < 10; ++i) {
+                    // Notify ToF_Task to start measuring
+                    xTaskNotifyGive(globalStruct.tofTaskHandle);
+
+                    xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
+                    if (distance <= MAX_CUP_DISTANCE) {
+                        state = POURING;
+                        goto skip;
+                    } else {
+                        vTaskDelay(DISTANCE_MEASURE_DELAY);
+                    }
+                }
+
+                state = ERROR;
 
                 break;
             case DONE:
@@ -243,7 +309,7 @@ _Noreturn void animationTask(void *param) {
 
                 break;
             case IDLE:
-                printf("IDLE\n");
+//                printf("IDLE\n");
 
                 // TODO: Play animation
                 idle_counter++;
@@ -254,22 +320,5 @@ _Noreturn void animationTask(void *param) {
 
                 break;
         }
-//        uint8_t i = (state / 8) % 3;
-//        draw_number(&disp, rotary_input);
-//        display_img(&disp);
-//        ssd1306_draw_string(&disp, 8, 24, 2, words[i]);
-//        ssd1306_show(&disp);
-//        vTaskDelay(800);
-//        ssd1306_clear(&disp);W
-
-
-
-
-//        xQueueReceive(globalStruct.rfidQueue, &rfid_state, portMAX_DELAY);
     }
-}
-
-int stabilize(int value) {
-    static int last_value = 0;
-
 }

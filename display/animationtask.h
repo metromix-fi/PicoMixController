@@ -9,6 +9,9 @@ void setup_display_gpios(void);
 
 _Noreturn void animationTask(void *param);
 
+#define MAX_CUP_DISTANCE 50
+#define DISTANCE_MEASURE_DELAY 1000
+
 
 // States
 
@@ -19,6 +22,7 @@ typedef enum MenuState {
     AUTHENTICATION,
     ERROR,
     POURING,
+    NO_CUP,
     DONE,
     IDLE
 } MenuState;

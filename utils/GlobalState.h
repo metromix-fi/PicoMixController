@@ -14,6 +14,8 @@ typedef struct {
     QueueHandle_t rfidQueue;
     QueueHandle_t tofQueue;
     QueueHandle_t pouringProgressQueue;
+    TaskHandle_t tofTaskHandle;
+    TaskHandle_t rfidTaskHandle;
 } GlobalStruct_t;
 
 extern GlobalStruct_t globalStruct;

@@ -28,7 +28,7 @@ int setup_tof() {
     return 1;
 }
 
-void tof_task(void *pvParameters) {
+_Noreturn void tof_task(void *pvParameters) {
 
     VL53L1X_Status_t status;
     VL53L1X_Result_t results;
@@ -51,13 +51,18 @@ void tof_task(void *pvParameters) {
 
     bool first_range = true;
     while (true) {
+
+        // Wait for notification
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        printf("tof task\n");
+
         // Read from stdin (blocking)
 //        getc(stdin);
         // Wait until we have new data
         uint8_t dataReady;
         do {
             status = VL53L1X_CheckForDataReady(I2C_DEV_ADDR, &dataReady);
-            VL53L1X_WaitMs(I2C_DEV_ADDR, 1);
+//            VL53L1X_WaitMs(I2C_DEV_ADDR, 1);
             vTaskDelay(1);
         } while (dataReady == 0);
 
@@ -75,6 +80,6 @@ void tof_task(void *pvParameters) {
             first_range = false;
         }
 
-        vTaskDelay(1000);
+//        vTaskDelay(1000);
     }
 }

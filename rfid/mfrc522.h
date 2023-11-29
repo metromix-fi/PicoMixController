@@ -53,10 +53,10 @@ typedef enum {
     MIFARE_ERR
 } MIFARE_Status_t;
 
-struct MifareUID {
+typedef struct MifareUID {
     uint8_t size;
     uint8_t bytes[10];
-};
+} MifareUID;
 
 /**
  * @brief   Driver state machine possible states.

@@ -29,10 +29,10 @@ int main() {
 
     // inits are in animation task now
 //    printf("configuring pins...\n");
-//    setup_display_gpios();
-//    setup_input_gpios();
-//    setup_rfid_gpios();
-//    setup_tof();
+    setup_display_gpios();
+    setup_input_gpios();
+    setup_rfid_gpios();
+    setup_tof();
 
 
     printf("Creating tasks...\n");
@@ -70,26 +70,29 @@ int main() {
 //    );
 
     // RFID
-//    TaskHandle_t rfid_task_handle = NULL;
-//    xTaskCreate(
-//            rfid_task,
-//            "rfid task",
-//            1024,
-//            NULL,
-//            tskIDLE_PRIORITY + 2,
-//            &rfid_task_handle
-//    );
+    TaskHandle_t rfid_task_handle = NULL;
+    xTaskCreate(
+            rfid_task,
+            "rfid task",
+            1024,
+            NULL,
+            tskIDLE_PRIORITY + 2,
+            &rfid_task_handle
+    );
+    globalStruct.rfidTaskHandle = rfid_task_handle;
 
 // Time of Flight
-//    TaskHandle_t tof_task_handle = NULL;
-//    xTaskCreate(
-//            tof_task,
-//            "tof task",
-//            1024,
-//            NULL,
-//            tskIDLE_PRIORITY + 2,
-//            &tof_task_handle
-//    );
+    TaskHandle_t tof_task_handle = NULL;
+    xTaskCreate(
+            tof_task,
+            "tof task",
+            1024,
+            NULL,
+            tskIDLE_PRIORITY + 2,
+            &tof_task_handle
+    );
+    globalStruct.tofTaskHandle = tof_task_handle;
+
 
     vTaskStartScheduler();
 

@@ -7,7 +7,6 @@
 
 #endif //METROMIX_TOFTASK_H
 
-
 int setup_tof();
 
-void tof_task(void *pvParameters);
+_Noreturn void tof_task(void *pvParameters);
