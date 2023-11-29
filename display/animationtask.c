@@ -89,6 +89,7 @@ _Noreturn void animationTask(void *param) {
     MifareUID rfid_state;
 
     // State
+    bool needs_update = true;
     MenuState state = DRINK_SELECT;
     CocktailConfig config;
     config.drink1 = DRINK_1;
@@ -107,25 +108,26 @@ _Noreturn void animationTask(void *param) {
     // tof distance
     uint16_t distance = 0;
 
-    // TODO: refactor without goto?
     TickType_t ticks_to_wait = 10000;
-    goto skip;
     for (;;) {
 
         // get input
-        if(xQueueReceive(globalStruct.rotaryEncoderQueue, &rotary_input, ticks_to_wait) == pdFALSE) {
-            state = IDLE;
-            ticks_to_wait = 64;
-        } else {
-            if (idle_counter != 0) {
-                idle_counter = 0;
-                state = DRINK_SELECT;
-                ticks_to_wait = 30000;
+        if (!needs_update) {
+            if (xQueueReceive(globalStruct.rotaryEncoderQueue, &rotary_input, ticks_to_wait) == pdFALSE) {
+                state = IDLE;
+                ticks_to_wait = 64;
+            } else {
+                if (idle_counter != 0) {
+                    idle_counter = 0;
+                    state = DRINK_SELECT;
+                    ticks_to_wait = 30000;
+                }
             }
+        } else {
+            needs_update = false;
         }
 
         // Break out of nested switch after state change with goto (show next display without waiting for input)
-        skip:
         // different actions for different states
         switch (state) {
             case DRINK_SELECT:
@@ -143,13 +145,16 @@ _Noreturn void animationTask(void *param) {
                         config.drink1 = drink;
                         state = SIZE_SELECT;
                         rotary_input = -1;
-                        goto skip;
+                        needs_update = true;
                 }
 
-                last_drink = drink;
-                ssd1306_clear(&disp);
-                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, words[drink]);
-                ssd1306_show(&disp);
+                if (!needs_update) {
+                    last_drink = drink;
+                    ssd1306_clear(&disp);
+                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, words[drink]);
+                    ssd1306_show(&disp);
+                }
+
                 break;
             case SIZE_SELECT:
 //                printf("SIZE_SELECT\n");
@@ -164,15 +169,17 @@ _Noreturn void animationTask(void *param) {
                         // confirm size and change state
                         state = MIXTURE_SELECT;
                         rotary_input = -1;
-                        goto skip;
+                        needs_update = true;
                 }
 
-                ssd1306_clear(&disp);
-                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Size");
-                ssd1306_draw_string_with_font(&disp, 8, 48, 1, acme_font,
-                                              config.size == SMALL ? "Small" : config.size == MEDIUM ? "Medium"
-                                                                                                     : "Large");
-                ssd1306_show(&disp);
+                if (!needs_update) {
+                    ssd1306_clear(&disp);
+                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Size");
+                    ssd1306_draw_string_with_font(&disp, 8, 48, 1, acme_font,
+                                                  config.size == SMALL ? "Small" : config.size == MEDIUM ? "Medium"
+                                                                                                         : "Large");
+                    ssd1306_show(&disp);
+                }
 
                 break;
             case MIXTURE_SELECT:
@@ -190,16 +197,18 @@ _Noreturn void animationTask(void *param) {
                         // confirm mixture and change state
                         state = AUTHENTICATION;
                         rotary_input = -1;
-                        goto skip;
+                        needs_update = true;
                 }
 
-                // display percentage determined by config.mixture
-                ssd1306_clear(&disp);
-                ssd1306_draw_string_with_font(&disp, 8, 8, 1, acme_font, "Mixture");
-                draw_number(&disp, 8, 24, 1, config.mixture[0]);
-//                ssd1306
-                draw_number(&disp, 8, 48, 1, config.mixture[1]);
-                ssd1306_show(&disp);
+                if (!needs_update) {
+                    // display percentage determined by config.mixture
+                    ssd1306_clear(&disp);
+                    ssd1306_draw_string_with_font(&disp, 8, 8, 1, acme_font, "Mixture");
+                    draw_number(&disp, 8, 24, 1, config.mixture[0]);
+                    // ssd1306
+                    draw_number(&disp, 8, 48, 1, config.mixture[1]);
+                    ssd1306_show(&disp);
+                }
 
                 break;
             case AUTHENTICATION:
@@ -223,11 +232,14 @@ _Noreturn void animationTask(void *param) {
                             printf("Success!\n");
                             printf("rfid_state: %x, %04X\n", rfid_state.size, rfid_state.bytes);
                             state = POURING;
-                            goto skip;
+                            needs_update = true;
                         }
                     }
                 }
-                state = ERROR;
+
+                if (!needs_update) {
+                    state = ERROR;
+                }
 
                 break;
             case ERROR:
@@ -248,34 +260,38 @@ _Noreturn void animationTask(void *param) {
                 xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
                 if (distance > MAX_CUP_DISTANCE) {
                     state = NO_CUP;
-                    goto skip;
+                    needs_update = true;
                 }
 
-                ssd1306_clear(&disp);
-                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Pouring");
-                ssd1306_show(&disp);
+                if (!needs_update) {
 
-                // TODO:Show timer progress
+                    ssd1306_clear(&disp);
+                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Pouring");
+                    ssd1306_show(&disp);
 
-                for (int i = 0; i < 10; ++i) {
-                    // Notify ToF_Task to start measuring
-                    xTaskNotifyGive(globalStruct.tofTaskHandle);
+                    // TODO:Show timer progress
 
-                    xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
-                    if (distance > MAX_CUP_DISTANCE) {
-                        state = NO_CUP;
-                        goto skip;
-                    } else {
-                        ssd1306_clear(&disp);
-                        ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Pouring");
-                        draw_number(&disp, 8, 48, 1, 10 - i);
-                        ssd1306_show(&disp);
-                        vTaskDelay(DISTANCE_MEASURE_DELAY);
+                    for (int i = 0; i < 10; ++i) {
+                        // Notify ToF_Task to start measuring
+                        xTaskNotifyGive(globalStruct.tofTaskHandle);
+
+                        xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
+                        if (distance > MAX_CUP_DISTANCE) {
+                            state = NO_CUP;
+                            needs_update = true;
+                        } else {
+                            ssd1306_clear(&disp);
+                            ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Pouring");
+                            draw_number(&disp, 8, 48, 1, 10 - i);
+                            ssd1306_show(&disp);
+                            vTaskDelay(DISTANCE_MEASURE_DELAY);
+                        }
                     }
-                }
 
-                state = DONE;
-                goto skip;
+                    state = DONE;
+                    needs_update = true;
+                    break;
+                }
 
             case NO_CUP:
                 printf("NO_CUP\n");
@@ -291,13 +307,15 @@ _Noreturn void animationTask(void *param) {
                     xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
                     if (distance <= MAX_CUP_DISTANCE) {
                         state = POURING;
-                        goto skip;
+                        needs_update = true;
                     } else {
                         vTaskDelay(DISTANCE_MEASURE_DELAY);
                     }
                 }
 
-                state = ERROR;
+                if (!needs_update) {
+                    state = ERROR;
+                }
 
                 break;
             case DONE:
@@ -306,14 +324,13 @@ _Noreturn void animationTask(void *param) {
                 ssd1306_clear(&disp);
                 ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Done");
                 ssd1306_show(&disp);
-                
+
                 vTaskDelay(5000);
                 state = DRINK_SELECT;
-                goto skip;
-                
-            case IDLE:
-//                printf("IDLE\n");
+                needs_update = true;
+                break;
 
+            case IDLE:
                 // TODO: Play animation
                 idle_counter++;
                 ssd1306_clear(&disp);
