@@ -35,7 +35,6 @@ typedef enum Drink {
 
 typedef enum Size {
     SMALL = 0,
-    MEDIUM,
     LARGE,
 } Size;
 

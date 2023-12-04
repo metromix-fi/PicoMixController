@@ -42,8 +42,62 @@ static void draw_number(ssd1306_t *disp, uint32_t x, uint32_t y, uint32_t scale,
     ssd1306_draw_string(disp, x, y, scale, buf);
 }
 
-static void display_img(ssd1306_t *disp) {
-    ssd1306_bmp_show_image(disp, image_data, image_size);
+
+/* Display images */
+static void display_drink_select(ssd1306_t *disp, uint8_t drink) {
+    ssd1306_clear(disp);
+    switch (drink) {
+        case DRINK_1:
+            ssd1306_bmp_show_image(disp, left_image, image_size);
+            break;
+        case DRINK_2:
+            ssd1306_bmp_show_image(disp, middle_image, image_size);
+            break;
+        case DRINK_3:
+            ssd1306_bmp_show_image(disp, right_image, image_size);
+            break;
+        default:
+            break;
+    }
+    ssd1306_show(disp);
+}
+
+static void display_size_select(ssd1306_t *disp, uint8_t size) {
+    ssd1306_clear(disp);
+    switch (size) {
+        case SMALL:
+            ssd1306_bmp_show_image(disp, small_image, image_size);
+            break;
+        case LARGE:
+            ssd1306_bmp_show_image(disp, large_image, image_size);
+            break;
+        default:
+            break;
+    }
+    ssd1306_show(disp);
+}
+
+static void display_auth(ssd1306_t *disp) {
+    ssd1306_clear(disp);
+    ssd1306_bmp_show_image(disp, auth_image, image_size);
+    ssd1306_show(disp);
+}
+
+static void display_error(ssd1306_t *disp) {
+    ssd1306_clear(disp);
+    ssd1306_bmp_show_image(disp, error_image, image_size);
+    ssd1306_show(disp);
+}
+
+static void display_nocup(ssd1306_t *disp) {
+    ssd1306_clear(disp);
+    ssd1306_bmp_show_image(disp, error_image, image_size);
+    ssd1306_show(disp);
+}
+
+static void display_done(ssd1306_t *disp) {
+    ssd1306_clear(disp);
+    ssd1306_bmp_show_image(disp, done_image, image_size);
     ssd1306_show(disp);
 }
 
@@ -54,7 +108,7 @@ void setup_display_gpios(void) {
     gpio_pull_up(14);
     gpio_pull_up(15);
 }
-
+/* -- End Images -- */
 
 // used as main application loop
 _Noreturn void animationTask(void *param) {
@@ -68,7 +122,7 @@ _Noreturn void animationTask(void *param) {
 //    setup_tof();
 
 
-    const int amount_drinks = 2;
+    const int amount_drinks = 3;
     const char *words[] = {"Vodka Cola", "Rum Cola"};
     const int liquid1[] = {DRINK_1, DRINK_2};
     const int liquid2[] = {DRINK_3, DRINK_3};
@@ -150,9 +204,8 @@ _Noreturn void animationTask(void *param) {
 
                 if (!needs_update) {
                     last_drink = drink;
-                    ssd1306_clear(&disp);
-                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, words[drink]);
-                    ssd1306_show(&disp);
+//                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, words[drink]);
+                    display_drink_select(&disp, drink);
                 }
 
                 break;
@@ -160,10 +213,10 @@ _Noreturn void animationTask(void *param) {
 //                printf("SIZE_SELECT\n");
                 switch (rotary_input) {
                     case CW_ROTATION:
-                        config.size = (config.size + 1) % 3;
+                        config.size = mod(config.size + 1, 2);
                         break;
                     case CCW_ROTATION:
-                        config.size = (config.size - 1) % 3;
+                        config.size = mod(config.size - 1, 2);
                         break;
                     case PUSH:
                         // confirm size and change state
@@ -173,12 +226,12 @@ _Noreturn void animationTask(void *param) {
                 }
 
                 if (!needs_update) {
-                    ssd1306_clear(&disp);
-                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Size");
-                    ssd1306_draw_string_with_font(&disp, 8, 48, 1, acme_font,
-                                                  config.size == SMALL ? "Small" : config.size == MEDIUM ? "Medium"
-                                                                                                         : "Large");
-                    ssd1306_show(&disp);
+//                    ssd1306_clear(&disp);
+//                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Size");
+//                    ssd1306_draw_string_with_font(&disp, 8, 48, 1, acme_font,
+//                                                  config.size == SMALL ? "Small" : "Large");
+//                    ssd1306_show(&disp);
+                    display_size_select(&disp, config.size);
                 }
 
                 break;
@@ -214,10 +267,7 @@ _Noreturn void animationTask(void *param) {
             case AUTHENTICATION:
                 printf("AUTHENTICATION\n");
 
-
-                ssd1306_clear(&disp);
-                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Authenticate RFID");
-                ssd1306_show(&disp);
+                display_auth(&disp);
 
                 bool auth = false;
                 xTaskNotifyGive(globalStruct.networkTaskHandle);
@@ -235,9 +285,8 @@ _Noreturn void animationTask(void *param) {
                 break;
             case ERROR:
                 printf("ERROR\n");
-                ssd1306_clear(&disp);
-                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Error");
-                ssd1306_show(&disp);
+
+                display_error(&disp);
 
                 vTaskDelay(3000);
                 state = DRINK_SELECT;
@@ -287,9 +336,7 @@ _Noreturn void animationTask(void *param) {
             case NO_CUP:
                 printf("NO_CUP\n");
 
-                ssd1306_clear(&disp);
-                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Place Cup");
-                ssd1306_show(&disp);
+                display_nocup(&disp);
 
                 for (int i = 0; i < 10; ++i) {
                     // Notify ToF_Task to start measuring
@@ -312,9 +359,7 @@ _Noreturn void animationTask(void *param) {
             case DONE:
                 printf("DONE\n");
 
-                ssd1306_clear(&disp);
-                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Done");
-                ssd1306_show(&disp);
+                display_done(&disp);
 
                 vTaskDelay(5000);
                 state = DRINK_SELECT;
