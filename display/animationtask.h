@@ -13,6 +13,8 @@ _Noreturn void animationTask(void *param);
 #define DISTANCE_MEASURE_DELAY 1000
 
 
+#define CUP_BASE_X 18
+
 // States
 
 typedef enum MenuState {
@@ -38,11 +40,15 @@ typedef enum Size {
     LARGE,
 } Size;
 
-typedef struct CocktailConfig {
-    Drink drink1;
-    Drink drink2;
+typedef struct CocktailState {
+    MenuState menuState;
+    bool needsUpdate;
+    InputEvent inputEvent;
+    Drink selectedDrink;
     Size size;
     int mixture[3];
-} CocktailConfig;
+    bool auth;
+    uint8_t progress;
+} CocktailState;
 
 #endif //METROMIX_ANIMATIONTASK_H

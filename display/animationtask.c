@@ -27,10 +27,12 @@
 #include "utils/helper.h"
 #include "rfid/rfidtask.h"
 #include "toftask/toftask.h"
+#include "pumps/pumptask.h"
 
 
 #define SLEEPTIME 25
 
+void set_menu_state(CocktailState *cocktailState, MenuState new, ssd1306_t *disp);
 
 const uint8_t num_chars_per_disp[] = {7, 7, 7, 5};
 const uint8_t *fonts[4] = {acme_font, bubblesstandard_font, crackers_font, BMSPA_font};
@@ -40,6 +42,28 @@ static void draw_number(ssd1306_t *disp, uint32_t x, uint32_t y, uint32_t scale,
     char buf[8];
     snprintf(buf, sizeof(buf), "%d", value);
     ssd1306_draw_string(disp, x, y, scale, buf);
+}
+
+void draw_dotted_line(ssd1306_t *p, int32_t x1, int32_t y1, int32_t x2, int32_t y2) {
+    if (x1 > x2) {
+        swap(&x1, &x2);
+        swap(&y1, &y2);
+    }
+
+    if (x1 == x2) {
+        if (y1 > y2)
+            swap(&y1, &y2);
+        for (int32_t i = y1; i <= y2; ++i)
+            ssd1306_clear_pixel(p, x1, i);
+        return;
+    }
+
+    float m = (float) (y2 - y1) / (float) (x2 - x1);
+
+    for (int32_t i = x1; i <= x2; i += 2) {
+        float y = m * (float) (i - x1) + (float) y1;
+        ssd1306_clear_pixel(p, i, (uint32_t) y);
+    }
 }
 
 
@@ -91,7 +115,7 @@ static void display_error(ssd1306_t *disp) {
 
 static void display_nocup(ssd1306_t *disp) {
     ssd1306_clear(disp);
-    ssd1306_bmp_show_image(disp, error_image, image_size);
+    ssd1306_bmp_show_image(disp, nocup_image, image_size);
     ssd1306_show(disp);
 }
 
@@ -101,6 +125,63 @@ static void display_done(ssd1306_t *disp) {
     ssd1306_show(disp);
 }
 
+static void display_mixture(ssd1306_t *disp, int mixture[]) {
+    ssd1306_clear(disp);
+    ssd1306_bmp_show_image(disp, mixture_image, image_size);
+    ssd1306_show(disp);
+}
+
+static void update_mixture(ssd1306_t *disp, uint8_t mixture) {
+    uint8_t y = 58 - mixture;
+    if (mixture == 0) {
+        ssd1306_draw_line(disp, CUP_BASE_X, y, CUP_BASE_X + 20, y);
+    } else if (mixture == 1) {
+        ssd1306_draw_line(disp, CUP_BASE_X - 2, y, CUP_BASE_X + 22, y);
+    } else if (mixture == 2) {
+        ssd1306_draw_line(disp, CUP_BASE_X - 3, y, CUP_BASE_X + 23, y);
+    } else if (mixture == 3) {
+        ssd1306_draw_line(disp, CUP_BASE_X - 4, y, CUP_BASE_X + 24, y);
+    } else if (mixture == 4 || mixture == 5) {
+        ssd1306_draw_line(disp, CUP_BASE_X - 5, y, CUP_BASE_X + 25, y);
+    } else if (y >= 6 && y < 9) {
+        ssd1306_draw_line(disp, CUP_BASE_X - 6, y, CUP_BASE_X + 26, y);
+    } else if (mixture >= 9 && mixture < 13) {
+        ssd1306_draw_line(disp, CUP_BASE_X - 7, y, CUP_BASE_X + 27, y);
+    } else if (mixture >= 13 && mixture < 17) {
+        ssd1306_draw_line(disp, CUP_BASE_X - 8, y, CUP_BASE_X + 28, y);
+    } else if (mixture >= 17 && mixture < 40) {
+        ssd1306_draw_line(disp, CUP_BASE_X - 9, y, CUP_BASE_X + 29, y);
+    } else {
+        // full
+    }
+}
+
+static void update_mixture_dotted(ssd1306_t *disp, uint8_t mixture) {
+    uint8_t mixtureIndex = mixture - 1;
+    uint8_t y = 59 - mixture;
+    if (mixtureIndex <= 0) {
+        // empty
+    } else if (mixtureIndex == 1) {
+        draw_dotted_line(disp, CUP_BASE_X - 2, y, CUP_BASE_X + 22, y);
+    } else if (mixtureIndex == 2) {
+        draw_dotted_line(disp, CUP_BASE_X - 3, y, CUP_BASE_X + 23, y);
+    } else if (mixtureIndex == 3) {
+        draw_dotted_line(disp, CUP_BASE_X - 4, y, CUP_BASE_X + 24, y);
+    } else if (mixtureIndex == 4 || mixtureIndex == 5) {
+        draw_dotted_line(disp, CUP_BASE_X - 5, y, CUP_BASE_X + 25, y);
+    } else if (y >= 6 && y < 9) {
+        draw_dotted_line(disp, CUP_BASE_X - 6, y, CUP_BASE_X + 26, y);
+    } else if (mixtureIndex >= 9 && mixtureIndex < 13) {
+        draw_dotted_line(disp, CUP_BASE_X - 7, y, CUP_BASE_X + 27, y);
+    } else if (mixtureIndex >= 13 && mixtureIndex < 17) {
+        draw_dotted_line(disp, CUP_BASE_X - 8, y, CUP_BASE_X + 28, y);
+    } else {
+        draw_dotted_line(disp, CUP_BASE_X - 9, y, CUP_BASE_X + 29, y);
+    }
+}
+
+/* -- End Images -- */
+
 void setup_display_gpios(void) {
     i2c_init(i2c1, 400000);
     gpio_set_function(14, GPIO_FUNC_I2C);
@@ -108,7 +189,6 @@ void setup_display_gpios(void) {
     gpio_pull_up(14);
     gpio_pull_up(15);
 }
-/* -- End Images -- */
 
 // used as main application loop
 _Noreturn void animationTask(void *param) {
@@ -136,25 +216,26 @@ _Noreturn void animationTask(void *param) {
 
     printf("ANIMATION!\n");
 
-//    char buf[8];
-
     // Input
-    InputEvent rotary_input = -1;
+//    InputEvent rotary_input = -1;
     MifareUID rfid_state;
 
     // State
-    bool needs_update = true;
-    MenuState state = DRINK_SELECT;
-    CocktailConfig config;
-    config.drink1 = DRINK_1;
-    config.drink2 = DRINK_2;
-    config.size = SMALL;
-    config.mixture[0] = 50;
-    config.mixture[1] = 50;
+//    bool needs_update = true;
+//    MenuState state = DRINK_SELECT;
+
+    CocktailState cocktailState;
+    cocktailState.inputEvent = -1;
+    cocktailState.menuState = DRINK_SELECT;
+    cocktailState.needsUpdate = true;
+    cocktailState.selectedDrink = DRINK_1;
+    cocktailState.size = SMALL;
+    cocktailState.mixture[0] = 50;
+    cocktailState.mixture[1] = 50;
+    cocktailState.auth = false;
 
     // drink select
     uint8_t drink = 0;
-    uint8_t last_drink = 0;
 
     // idle counter
     int idle_counter = 0;
@@ -163,31 +244,34 @@ _Noreturn void animationTask(void *param) {
     uint16_t distance = 0;
 
     TickType_t ticks_to_wait = 10000;
+
+    //pump command
+    PumpData pumpData;
+
     for (;;) {
 
         // get input
-        if (!needs_update) {
-            if (xQueueReceive(globalStruct.rotaryEncoderQueue, &rotary_input, ticks_to_wait) == pdFALSE) {
-                state = IDLE;
+        if (!cocktailState.needsUpdate) {
+            if (xQueueReceive(globalStruct.rotaryEncoderQueue, &cocktailState.inputEvent, ticks_to_wait) ==
+                pdFALSE) {
+                set_menu_state(&cocktailState, IDLE, &disp);
                 ticks_to_wait = 64;
             } else {
                 if (idle_counter != 0) {
                     idle_counter = 0;
-                    state = DRINK_SELECT;
+                    set_menu_state(&cocktailState, DRINK_SELECT, &disp);
                     ticks_to_wait = 30000;
                 }
             }
         } else {
-            needs_update = false;
+            cocktailState.needsUpdate = false;
         }
 
-        // Break out of nested switch after state change with goto (show next display without waiting for input)
+        // Break out of nested switch after cocktailState change with goto (show next display without waiting for input)
         // different actions for different states
-        switch (state) {
+        switch (cocktailState.menuState) {
             case DRINK_SELECT:
-//                printf("DRINK_SELECT\n");
-
-                switch (rotary_input) {
+                switch (cocktailState.inputEvent) {
                     case CW_ROTATION:
                         drink = mod(drink + 1, amount_drinks);
                         break;
@@ -195,15 +279,13 @@ _Noreturn void animationTask(void *param) {
                         drink = mod(drink - 1, amount_drinks);
                         break;
                     case PUSH:
-                        // confirm drink and change state
-                        config.drink1 = drink;
-                        state = SIZE_SELECT;
-                        rotary_input = -1;
-                        needs_update = true;
+                        // confirm drink and change cocktailState
+                        cocktailState.selectedDrink = drink;
+                        set_menu_state(&cocktailState, SIZE_SELECT, &disp);
+                        cocktailState.inputEvent = -1;
                 }
 
-                if (!needs_update) {
-                    last_drink = drink;
+                if (!cocktailState.needsUpdate) {
 //                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, words[drink]);
                     display_drink_select(&disp, drink);
                 }
@@ -211,55 +293,54 @@ _Noreturn void animationTask(void *param) {
                 break;
             case SIZE_SELECT:
 //                printf("SIZE_SELECT\n");
-                switch (rotary_input) {
+                switch (cocktailState.inputEvent) {
                     case CW_ROTATION:
-                        config.size = mod(config.size + 1, 2);
+                        cocktailState.size = mod(cocktailState.size + 1, 2);
                         break;
                     case CCW_ROTATION:
-                        config.size = mod(config.size - 1, 2);
+                        cocktailState.size = mod(cocktailState.size - 1, 2);
                         break;
                     case PUSH:
-                        // confirm size and change state
-                        state = MIXTURE_SELECT;
-                        rotary_input = -1;
-                        needs_update = true;
+                        // confirm size and change cocktailState
+                        set_menu_state(&cocktailState, MIXTURE_SELECT, &disp);
+                        cocktailState.inputEvent = -1;
                 }
 
-                if (!needs_update) {
+                if (!cocktailState.needsUpdate) {
 //                    ssd1306_clear(&disp);
 //                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Size");
 //                    ssd1306_draw_string_with_font(&disp, 8, 48, 1, acme_font,
-//                                                  config.size == SMALL ? "Small" : "Large");
+//                                                  cocktailState.size == SMALL ? "Small" : "Large");
 //                    ssd1306_show(&disp);
-                    display_size_select(&disp, config.size);
+                    display_size_select(&disp, cocktailState.size);
                 }
 
                 break;
             case MIXTURE_SELECT:
-//                printf("MIXTURE_SELECT\n");
-                switch (rotary_input) {
+                switch (cocktailState.inputEvent) {
                     case CW_ROTATION:
-                        config.mixture[0] = clamp(config.mixture[0] + 1, 0, 100);
-                        config.mixture[1] = clamp(config.mixture[1] - 1, 0, 100);
+                        cocktailState.mixture[0] = clamp(cocktailState.mixture[0] + 1, 0, 100);
+                        cocktailState.mixture[1] = clamp(cocktailState.mixture[1] - 1, 0, 100);
                         break;
                     case CCW_ROTATION:
-                        config.mixture[0] = clamp(config.mixture[0] - 1, 0, 100);
-                        config.mixture[1] = clamp(config.mixture[1] + 1, 0, 100);
+                        cocktailState.mixture[0] = clamp(cocktailState.mixture[0] - 1, 0, 100);
+                        cocktailState.mixture[1] = clamp(cocktailState.mixture[1] + 1, 0, 100);
                         break;
                     case PUSH:
-                        // confirm mixture and change state
-                        state = AUTHENTICATION;
-                        rotary_input = -1;
-                        needs_update = true;
+                        // confirm mixture and change cocktailState
+                        set_menu_state(&cocktailState, AUTHENTICATION, &disp);
+                        cocktailState.inputEvent = -1;
                 }
 
-                if (!needs_update) {
-                    // display percentage determined by config.mixture
-                    ssd1306_clear(&disp);
-                    ssd1306_draw_string_with_font(&disp, 8, 8, 1, acme_font, "Mixture");
-                    draw_number(&disp, 8, 24, 1, config.mixture[0]);
+                if (!cocktailState.needsUpdate) {
+                    // display percentage determined by cocktailState.mixture
+//                    ssd1306_clear(&disp);
+//                    ssd1306_draw_string_with_font(&disp, 8, 8, 1, acme_font, "Mixture");
+                    update_mixture(&disp, (uint8_t) (cocktailState.mixture[0] * 0.4));
+                    update_mixture_dotted(&disp, (uint8_t) (cocktailState.mixture[0] * 0.4));
+//                    draw_number(&disp, 8, 24, 1, cocktailState.mixture[0]);
                     // ssd1306
-                    draw_number(&disp, 8, 48, 1, config.mixture[1]);
+//                    draw_number(&disp, 8, 48, 1, cocktailState.mixture[1]);
                     ssd1306_show(&disp);
                 }
 
@@ -276,12 +357,10 @@ _Noreturn void animationTask(void *param) {
                 printf("auth: %d\n", auth);
 
                 if (!auth) {
-                    state = ERROR;
+                    set_menu_state(&cocktailState, ERROR, &disp);
                 } else {
-                    state = POURING;
+                    set_menu_state(&cocktailState, POURING, &disp);
                 }
-
-                needs_update = true;
                 break;
             case ERROR:
                 printf("ERROR\n");
@@ -289,49 +368,81 @@ _Noreturn void animationTask(void *param) {
                 display_error(&disp);
 
                 vTaskDelay(3000);
-                state = DRINK_SELECT;
+                set_menu_state(&cocktailState, DRINK_SELECT, &disp);
                 break;
             case POURING:
                 printf("POURING\n");
 
-                // Notify ToF_Task to start measuring
+//                uint8_t sizePrescaler = cocktailState.size == SMALL ? 1 : 2;
+                TickType_t pouringTicksToWaitBase =
+                        cocktailState.size == SMALL ? TIME_TO_POUR_SMALL : TIME_TO_POUR_LARGE;
+                TickType_t pouringTicksToWait1 = pouringTicksToWaitBase * cocktailState.mixture[0];
+                TickType_t pouringTicksToWait2 = pouringTicksToWaitBase * cocktailState.mixture[1];
+
+                TickType_t progressInterval =
+                        pouringTicksToWait1 > pouringTicksToWait2 ? pouringTicksToWait1 : pouringTicksToWait2;
+                progressInterval /= 10;
+
+                // Notify ToF_Task to start measuring and check distance once
                 xTaskNotifyGive(globalStruct.tofTaskHandle);
 
                 xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
                 if (distance > MAX_CUP_DISTANCE) {
-                    state = NO_CUP;
-                    needs_update = true;
+                    set_menu_state(&cocktailState, NO_CUP, &disp);
                 }
 
-                if (!needs_update) {
+                // start pouring
+                if (!cocktailState.needsUpdate) {
 
                     ssd1306_clear(&disp);
-                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Pouring");
-                    ssd1306_show(&disp);
 
-                    // TODO:Show timer progress
+                    switch (cocktailState.selectedDrink) {
+                        case DRINK_1:
+                            pumpData.command = PUMP_ON;
+                            pumpData.pumpNumber = PUMP_1;
+                            pumpData.timeToPour = pouringTicksToWait1;
+                            xQueueSendToBack(globalStruct.pumpControllerQueue, &pumpData, portMAX_DELAY);
 
-                    for (int i = 0; i < 10; ++i) {
+                            pumpData.command = PUMP_ON;
+                            pumpData.pumpNumber = PUMP_2;
+                            pumpData.timeToPour = pouringTicksToWait2;
+                            xQueueSendToBack(globalStruct.pumpControllerQueue, &pumpData, portMAX_DELAY);
+                            break;
+                        case DRINK_2:
+                            //  TODO: implement
+                            break;
+                        case DRINK_3:
+                            // TODO: implement
+                            break;
+                    }
+
+                    while (cocktailState.progress > 0) {
                         // Notify ToF_Task to start measuring
                         xTaskNotifyGive(globalStruct.tofTaskHandle);
 
                         xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
                         if (distance > MAX_CUP_DISTANCE) {
-                            state = NO_CUP;
-                            needs_update = true;
+                            pumpData.command = PUMP_OFF;
+                            xQueueSendToBack(globalStruct.pumpControllerQueue, &pumpData, portMAX_DELAY);
+                            set_menu_state(&cocktailState, NO_CUP, &disp);
+                            break;
                         } else {
                             ssd1306_clear(&disp);
                             ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Pouring");
-                            draw_number(&disp, 8, 48, 1, 10 - i);
+                            draw_number(&disp, 8, 48, 1, cocktailState.progress);
                             ssd1306_show(&disp);
                             vTaskDelay(DISTANCE_MEASURE_DELAY);
+                            cocktailState.progress--;
                         }
+
+                        vTaskDelay(progressInterval);
                     }
 
-                    state = DONE;
-                    needs_update = true;
-                    break;
+                    if (cocktailState.progress == 0) {
+                        set_menu_state(&cocktailState, DONE, &disp);
+                    }
                 }
+                break;
 
             case NO_CUP:
                 printf("NO_CUP\n");
@@ -344,15 +455,14 @@ _Noreturn void animationTask(void *param) {
 
                     xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
                     if (distance <= MAX_CUP_DISTANCE) {
-                        state = POURING;
-                        needs_update = true;
+                        set_menu_state(&cocktailState, POURING, &disp);
                     } else {
                         vTaskDelay(DISTANCE_MEASURE_DELAY);
                     }
                 }
 
-                if (!needs_update) {
-                    state = ERROR;
+                if (!cocktailState.needsUpdate) {
+                    set_menu_state(&cocktailState, ERROR, &disp);
                 }
 
                 break;
@@ -362,8 +472,7 @@ _Noreturn void animationTask(void *param) {
                 display_done(&disp);
 
                 vTaskDelay(5000);
-                state = DRINK_SELECT;
-                needs_update = true;
+                set_menu_state(&cocktailState, DRINK_SELECT, &disp);
                 break;
 
             case IDLE:
@@ -377,4 +486,52 @@ _Noreturn void animationTask(void *param) {
                 break;
         }
     }
+}
+
+void set_menu_state(CocktailState *cocktailState, MenuState new, ssd1306_t *disp) {
+    switch (new) {
+        case DRINK_SELECT:
+            printf("DRINK_SELECT\n");
+            cocktailState->menuState = DRINK_SELECT;
+            break;
+        case SIZE_SELECT:
+            printf("SIZE_SELECT\n");
+            cocktailState->menuState = SIZE_SELECT;
+            break;
+        case MIXTURE_SELECT:
+            printf("MIXTURE_SELECT\n");
+            display_mixture(disp, &cocktailState->mixture[0]);
+            cocktailState->menuState = MIXTURE_SELECT;
+            break;
+        case AUTHENTICATION:
+            printf("AUTHENTICATION\n");
+            cocktailState->menuState = AUTHENTICATION;
+            break;
+        case ERROR:
+            printf("ERROR\n");
+            cocktailState->menuState = ERROR;
+            break;
+        case POURING:
+            printf("POURING\n");
+            if (cocktailState->menuState != NO_CUP) {
+                cocktailState->progress = 0;
+            }
+            cocktailState->menuState = POURING;
+            break;
+        case NO_CUP:
+            printf("NO_CUP\n");
+            cocktailState->menuState = NO_CUP;
+            break;
+        case DONE:
+            printf("DONE\n");
+            cocktailState->menuState = DONE;
+            break;
+        case IDLE:
+            printf("IDLE\n");
+            cocktailState->menuState = IDLE;
+            break;
+
+
+    }
+    cocktailState->needsUpdate = true;
 }
