@@ -2,6 +2,7 @@
 // Created by jesse on 20.11.23.
 //
 
+#include <stdint-gcc.h>
 #include "helper.h"
 
 
@@ -39,4 +40,10 @@ int mod(int a, int b)
     if(ret < 0)
         ret+=b;
     return ret;
+}
+
+void swap(int32_t *a, int32_t *b) {
+    int32_t *t=a;
+    *a=*b;
+    *b=*t;
 }

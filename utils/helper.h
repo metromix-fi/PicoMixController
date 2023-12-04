@@ -13,5 +13,6 @@ int clamp(int value, int min, int max);
 
 int mod(int a, int b);
 
+void swap(int32_t *a, int32_t *b);
 
 #endif //METROMIX_HELPER_H
