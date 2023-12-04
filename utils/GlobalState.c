@@ -8,6 +8,7 @@
 #include "GlobalState.h"
 #include "input/inputhandler.h"
 #include "rfid/mfrc522.h"
+#include "pumps/pumptask.h"
 
 GlobalStruct_t globalStruct;
 
@@ -17,5 +18,7 @@ void initializeGlobalStruct() {
     globalStruct.rfidQueue = xQueueCreate(8 , sizeof(MifareUID));
     globalStruct.authenticationQueue = xQueueCreate(8, sizeof(bool));
     globalStruct.tofQueue = xQueueCreate(8, sizeof(uint16_t));
-    globalStruct.pouringProgressQueue = xQueueCreate(8, sizeof(uint8_t));
+    globalStruct.pumpControllerQueue = xQueueCreate(8, sizeof(PumpData));
+    globalStruct.pumpTask1Queue = xQueueCreate(8, sizeof(PumpData));
+    globalStruct.pumpTask2Queue = xQueueCreate(8, sizeof(PumpData));
 }

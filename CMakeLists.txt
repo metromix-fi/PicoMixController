@@ -58,6 +58,8 @@ add_executable(metromix
 		toftask/toftask.h
 		utils/helper.c
 		utils/helper.h
+        pumps/pumptask.c
+        pumps/pumptask.h
 )
 
 target_link_libraries(metromix
