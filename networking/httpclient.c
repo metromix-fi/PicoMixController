@@ -11,8 +11,9 @@
 #include "rfid/mfrc522.h"
 
 #define TLS_CLIENT_SERVER        "192.168.162.226"
+#define CONTENT_LENGTH           "44"
 
-#define TLS_CLIENT_TIMEOUT_SECS  15
+#define TLS_CLIENT_TIMEOUT_SECS  25
 
 extern bool
 run_tls_client_test(const uint8_t *cert, size_t cert_len, const char *server, const char *request, int timeout);
@@ -31,7 +32,7 @@ _Noreturn void networkTask(void *param) {
     char request[] = "POST /api HTTP/1.1\r\n" \
                                  "Host: " TLS_CLIENT_SERVER"\r\n" \
                                  "Content-Type: text/plain\r\n" \
-                                 "Content-Length: 8\r\n" \
+                                 "Content-Length: " CONTENT_LENGTH"\r\n" \
                                  "Connection: close\r\n" \
                                  "\r\n";
 
@@ -55,54 +56,89 @@ _Noreturn void networkTask(void *param) {
         }
 
         MifareUID rfid_state;
-        size_t request_len = strlen(request);
+//        size_t request_len = strlen(request);
+        size_t body_len;
+        NetworkData networkData;
+        bool auth;
+        uint request_len;
 
         for (;;) {
-//            xQueueReceive(globalStruct.rfidQueue, &rfid_state, portMAX_DELAY);
-            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+            body_len = 56;
+            auth = false;
+            request_len = strlen(request);
+
+            xQueueReceive(globalStruct.networkQueue, &networkData, portMAX_DELAY);
+//            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
             printf("network task\n");
 
-            bool auth = false;
-            for (int i = 0; i < 10; ++i) {
-                // Notify RFID_Task to start measuring
-                xTaskNotifyGive(globalStruct.rfidTaskHandle);
+            printf("NetworkData: %lu, %s\n", networkData.dataLength, networkData.data);
 
-                if (xQueueReceive(globalStruct.rfidQueue, &rfid_state, portMAX_DELAY)) {
-                    if (rfid_state.size == 0) {
-                        vTaskDelay(1000);
-                        continue;
-                    } else {
-                        printf("Success!\n");
-                        printf("rfid_state: %x, %06X\n", rfid_state.size, rfid_state.bytes);
-                        break;
+//            body_len += networkData.dataLength;
+
+            if (networkData.event == NETWORK_EVENT_AUTHENTICATE) {
+                printf("NETWORK_EVENT_AUTHENTICATE\n");
+
+                for (int i = 0; i < 10; ++i) {
+                    // Notify RFID_Task to start measuring
+                    xTaskNotifyGive(globalStruct.rfidTaskHandle);
+
+                    if (xQueueReceive(globalStruct.rfidQueue, &rfid_state, portMAX_DELAY)) {
+                        if (rfid_state.size == 0) {
+                            vTaskDelay(1000);
+                            continue;
+                        } else {
+                            printf("Success!\n");
+                            printf("rfid_state: %x, %06X\n", rfid_state.size, rfid_state.bytes);
+                            break;
+                        }
                     }
                 }
-            }
-            if (rfid_state.size == 0) {
-                printf("No RFID tag found\n");
-                xQueueSendToBack(globalStruct.authenticationQueue, &auth, portMAX_DELAY);
-                continue;
+                if (rfid_state.size == 0) {
+                    printf("No RFID tag found\n");
+                    xQueueSendToBack(globalStruct.authenticationQueue, &auth, portMAX_DELAY);
+                    continue;
+                }
             }
 
-            size_t new_size = request_len + rfid_state.size + 1;
+//            char request[128];
+//            snprintf(request, 128,
+//                     "POST /api HTTP/1.1\r\n"
+//                     "Host: %zu\r\n"
+//                     "Content-Type: text/plain\r\n"
+//                     "Content-Length: %d\r\n"
+//                     "Connection: close\r\n"
+//                     "\r\n"
+//                     "%s"
+//                     TLS_CLIENT_SERVER, body_len + 14, *networkData.data);
+//            uint request_len = strlen(request);
+//            body_len += rfid_state.size + 1;
+            size_t new_size = request_len + body_len + 12;
             char *new_request = pvPortMalloc(new_size);
-
+//            char *new_request = pvPortMalloc(256);
             if (new_request == NULL) {
                 printf("Failed to allocate memory for request\n");
                 continue;
             }
 
+//            printf("New Request1: \n\r%s", new_request);
+            // Copy the old request
             strcpy(new_request, request);
 
-            // Append each byte as hex
+            // append networkData.data to new_request
+            strcat(new_request, networkData.data);
+
+            // append rfid to new_request
+            strcat(new_request, "&rfid=");
+//            // Append each byte of rfid as hex
             for (int i = 0; i < rfid_state.size; i++) {
-                sprintf(new_request + strlen(request) + i * 2, "%02X", rfid_state.bytes[i]);
+                sprintf(new_request + strlen(new_request) + i * 2, "%02X", rfid_state.bytes[i]);
             }
 
             // Null terminate the string
 //            new_request[new_size - 1] = '\0';
 
-            printf("New Request: \n\r%s", new_request);
+            printf("New Request2: \n\r%s", new_request);
+            printf("SIZE: \n\r%zu", new_size - request_len);
 
             printf("Connecting to server: " TLS_CLIENT_SERVER);
             bool pass = run_tls_client_test(NULL, 0, TLS_CLIENT_SERVER, new_request,
@@ -115,7 +151,6 @@ _Noreturn void networkTask(void *param) {
             }
 
             xQueueSendToBack(globalStruct.authenticationQueue, &auth, portMAX_DELAY);
-//            free(new_request);
             vPortFree(new_request);
         }
     }

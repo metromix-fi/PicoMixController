@@ -10,6 +10,7 @@
 #include "rfid/mfrc522.h"
 #include "pumps/pumptask.h"
 #include "buzzer/buzzertask.h"
+#include "networking/httpclient.h"
 
 GlobalStruct_t globalStruct;
 
@@ -23,4 +24,5 @@ void initializeGlobalStruct() {
     globalStruct.pumpTask1Queue = xQueueCreate(8, sizeof(PumpData));
     globalStruct.pumpTask2Queue = xQueueCreate(8, sizeof(PumpData));
     globalStruct.buzzerQueue = xQueueCreate(8, sizeof(BuzzerEvent));
+    globalStruct.networkQueue = xQueueCreate(2, sizeof(NetworkData));
 }

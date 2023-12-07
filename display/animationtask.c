@@ -234,9 +234,6 @@ _Noreturn void animationTask(void *param) {
     CocktailState cocktailState;
     set_menu_state(&cocktailState, DRINK_SELECT, &disp);
 
-    // drink select
-    uint8_t drink = 0;
-
     // idle counter
     int idle_counter = 0;
 
@@ -276,10 +273,10 @@ _Noreturn void animationTask(void *param) {
             case DRINK_SELECT:
                 switch (cocktailState.inputEvent) {
                     case CW_ROTATION:
-                        cocktailState.selectedDrink = mod(cocktailState.selectedDrink = drink+ 1, amount_drinks);
+                        cocktailState.selectedDrink = mod(cocktailState.selectedDrink = cocktailState.selectedDrink + 1, amount_drinks);
                         break;
                     case CCW_ROTATION:
-                        cocktailState.selectedDrink = mod(cocktailState.selectedDrink = drink- 1, amount_drinks);
+                        cocktailState.selectedDrink = mod(cocktailState.selectedDrink = cocktailState.selectedDrink - 1, amount_drinks);
                         break;
                     case PUSH:
                         // confirm drink and change cocktailState
@@ -289,7 +286,7 @@ _Noreturn void animationTask(void *param) {
 
                 if (!cocktailState.needsUpdate) {
 //                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, words[drink]);
-                    display_drink_select(&disp,cocktailState.selectedDrink = drink);
+                    display_drink_select(&disp, cocktailState.selectedDrink);
                 }
 
                 break;
@@ -351,8 +348,19 @@ _Noreturn void animationTask(void *param) {
             case AUTHENTICATION:
                 display_auth(&disp);
 
+
+                char body[80];
+                sprintf(body, "drink=%d&size=%d&liquid1=%d&liquid2=%d", cocktailState.selectedDrink,
+                        cocktailState.size, cocktailState.mixture[0],
+                        cocktailState.mixture[1]);
+                NetworkData data;
+                data.event = NETWORK_EVENT_AUTHENTICATE;
+                data.data = body;
+                data.dataLength = strlen(body);
+//                xTaskNotifyGive(globalStruct.networkTaskHandle);
+                xQueueSendToBack(globalStruct.networkQueue, &data, portMAX_DELAY);
+
                 bool auth = false;
-                xTaskNotifyGive(globalStruct.networkTaskHandle);
                 xQueueReceive(globalStruct.authenticationQueue, &auth, portMAX_DELAY);
 
                 printf("auth: %d\n", auth);

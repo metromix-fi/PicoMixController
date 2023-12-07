@@ -52,7 +52,6 @@ int main() {
                 tskIDLE_PRIORITY + 1,
                 &networking_task_handle
             );
-    globalStruct.networkTaskHandle = networking_task_handle;
 
     // Display
     TaskHandle_t animation_task_handle = NULL;
@@ -134,16 +133,16 @@ int main() {
             &pumpTaskHandle2
     );
 
-    // Buzzer Task
-    TaskHandle_t buzzer_task_handle = NULL;
-    xTaskCreate(
-            buzzerTask,
-            "buzzer task",
-            configMINIMAL_STACK_SIZE + 128,
-            NULL,
-            tskIDLE_PRIORITY + 2,
-            &buzzer_task_handle
-    );
+//     Buzzer Task
+//    TaskHandle_t buzzer_task_handle = NULL;
+//    xTaskCreate(
+//            buzzerTask,
+//            "buzzer task",
+//            configMINIMAL_STACK_SIZE + 128,
+//            NULL,
+//            tskIDLE_PRIORITY + 2,
+//            &buzzer_task_handle
+//    );
 
     vTaskStartScheduler();
 

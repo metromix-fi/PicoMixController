@@ -18,9 +18,9 @@ typedef struct {
     QueueHandle_t pumpTask1Queue;
     QueueHandle_t pumpTask2Queue;
     QueueHandle_t buzzerQueue;
+    QueueHandle_t networkQueue;
     TaskHandle_t tofTaskHandle;
     TaskHandle_t rfidTaskHandle;
-    TaskHandle_t networkTaskHandle;
 } GlobalStruct_t;
 
 extern GlobalStruct_t globalStruct;
