@@ -60,12 +60,15 @@ add_executable(metromix
 		utils/helper.h
         pumps/pumptask.c
         pumps/pumptask.h
+		buzzer/buzzertask.c
+		buzzer/buzzertask.h
 )
 
 target_link_libraries(metromix
         pico_stdlib
         hardware_i2c
 		hardware_spi
+		hardware_pwm
         FreeRTOS
 		pico_lwip_mbedtls
 		pico_mbedtls

@@ -17,6 +17,7 @@ typedef struct {
     QueueHandle_t pumpControllerQueue;
     QueueHandle_t pumpTask1Queue;
     QueueHandle_t pumpTask2Queue;
+    QueueHandle_t buzzerQueue;
     TaskHandle_t tofTaskHandle;
     TaskHandle_t rfidTaskHandle;
     TaskHandle_t networkTaskHandle;

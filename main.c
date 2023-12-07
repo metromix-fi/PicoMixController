@@ -22,6 +22,7 @@
 #include "rfid/rfidtask.h"
 #include "toftask/toftask.h"
 #include "pumps/pumptask.h"
+#include "buzzer/buzzertask.h"
 
 #define PICO_TIME_DEFAULT_ALARM_POOL_DISABLED = 1;
 
@@ -133,6 +134,16 @@ int main() {
             &pumpTaskHandle2
     );
 
+    // Buzzer Task
+    TaskHandle_t buzzer_task_handle = NULL;
+    xTaskCreate(
+            buzzerTask,
+            "buzzer task",
+            configMINIMAL_STACK_SIZE + 128,
+            NULL,
+            tskIDLE_PRIORITY + 2,
+            &buzzer_task_handle
+    );
 
     vTaskStartScheduler();
 

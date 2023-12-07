@@ -8,7 +8,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
-#include "timers.h"
 #include "utils/GlobalState.h"
 
 typedef struct PumpState {

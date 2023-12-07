@@ -28,6 +28,7 @@
 #include "rfid/rfidtask.h"
 #include "toftask/toftask.h"
 #include "pumps/pumptask.h"
+#include "buzzer/buzzertask.h"
 
 
 #define SLEEPTIME 25
@@ -246,6 +247,9 @@ _Noreturn void animationTask(void *param) {
 
     //pump command
     PumpData pumpData;
+
+    // buzzer event
+    BuzzerEvent buzzerEvent;
 
     for (;;) {
 
@@ -477,7 +481,9 @@ _Noreturn void animationTask(void *param) {
 
                 break;
             case DONE:
-                printf("DONE\n");
+                // Activate buzzer melody
+                buzzerEvent = MELODY_1;
+                xQueueSendToBack(globalStruct.buzzerQueue, &buzzerEvent, portMAX_DELAY);
 
                 display_done(&disp);
 
