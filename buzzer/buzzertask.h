@@ -5,7 +5,7 @@
 #ifndef METROMIX_BUZZERTASK_H
 #define METROMIX_BUZZERTASK_H
 
-#define BUZZER_PIN 5
+#define BUZZER_PIN 1
 
 #define P 0
 #define B0  1

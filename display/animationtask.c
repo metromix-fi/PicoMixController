@@ -129,6 +129,8 @@ static void display_done(ssd1306_t *disp) {
 static void display_mixture(ssd1306_t *disp, int mixture[]) {
     ssd1306_clear(disp);
     ssd1306_bmp_show_image(disp, mixture_image, image_size);
+    draw_number(disp, 72, 24, 1, mixture[0]);
+    draw_number(disp, 72, 48, 1, mixture[1]);
     for (int i = 0; i < 40; i++) {
         ssd1306_draw_line(disp, CUP_BASE_X - 9, 59 - i, CUP_BASE_X + 29, 59 - i);
     }
@@ -138,7 +140,14 @@ static void display_mixture(ssd1306_t *disp, int mixture[]) {
     ssd1306_show(disp);
 }
 
-static void update_mixture(ssd1306_t *disp, uint8_t mixture) {
+static void update_mixture(ssd1306_t *disp, int mixtureArr[]) {
+
+    ssd1306_clear(disp);
+    ssd1306_bmp_show_image(disp, mixture_image, image_size);
+    draw_number(disp, 72, 24, 1, mixtureArr[0]);
+    draw_number(disp, 72, 48, 1, mixtureArr[1]);
+
+    int mixture = mixtureArr[0] * 0.4f;
     uint8_t y = 58 - mixture;
     if (mixture == 0) {
         ssd1306_draw_line(disp, CUP_BASE_X, y, CUP_BASE_X + 20, y);
@@ -185,6 +194,19 @@ static void update_mixture_dotted(ssd1306_t *disp, uint8_t mixture) {
     } else {
         draw_dotted_line(disp, CUP_BASE_X - 9, y, CUP_BASE_X + 29, y);
     }
+}
+
+void display_idle(ssd1306_t *disp, int idle_counter) {
+    int frame = idle_counter % 2;
+
+    ssd1306_clear(disp);
+//    draw_number(disp, 36, 48, 1, idle_counter);
+    if (frame == 0) {
+        ssd1306_bmp_show_image(disp, idle2_image, image_size);
+    } else if (frame == 1)  {
+        ssd1306_bmp_show_image(disp, idle1_image, image_size);
+    }
+    ssd1306_show(disp);
 }
 
 /* -- End Images -- */
@@ -255,7 +277,7 @@ _Noreturn void animationTask(void *param) {
             if (xQueueReceive(globalStruct.rotaryEncoderQueue, &cocktailState.inputEvent, ticks_to_wait) ==
                 pdFALSE) {
                 set_menu_state(&cocktailState, IDLE, &disp);
-                ticks_to_wait = 64;
+                ticks_to_wait = 512;
             } else {
                 if (idle_counter != 0) {
                     idle_counter = 0;
@@ -327,8 +349,8 @@ _Noreturn void animationTask(void *param) {
                         break;
                     case PUSH:
                         // confirm mixture and change cocktailState
-                        set_menu_state(&cocktailState, AUTHENTICATION, &disp);
-//                        set_menu_state(&cocktailState, POURING, &disp);
+//                        set_menu_state(&cocktailState, AUTHENTICATION, &disp);
+                        set_menu_state(&cocktailState, POURING, &disp);
                         cocktailState.inputEvent = -1;
                 }
 
@@ -336,7 +358,7 @@ _Noreturn void animationTask(void *param) {
                     // display percentage determined by cocktailState.mixture
 //                    ssd1306_clear(&disp);
 //                    ssd1306_draw_string_with_font(&disp, 8, 8, 1, acme_font, "Mixture");
-                    update_mixture(&disp, (uint8_t) (cocktailState.mixture[0] * 0.4));
+                    update_mixture(&disp, cocktailState.mixture);
                     update_mixture_dotted(&disp, (uint8_t) (cocktailState.mixture[0] * 0.4));
 //                    draw_number(&disp, 8, 24, 1, cocktailState.mixture[0]);
                     // ssd1306
@@ -382,12 +404,12 @@ _Noreturn void animationTask(void *param) {
 //                uint8_t sizePrescaler = cocktailState.size == SMALL ? 1 : 2;
                 TickType_t pouringTicksToWaitBase =
                         cocktailState.size == SMALL ? TIME_TO_POUR_SMALL : TIME_TO_POUR_LARGE;
-                TickType_t pouringTicksToWait1 = pouringTicksToWaitBase * cocktailState.mixture[0];
-                TickType_t pouringTicksToWait2 = pouringTicksToWaitBase * cocktailState.mixture[1];
+                TickType_t pouringTicksToWait1 = pouringTicksToWaitBase * cocktailState.mixture[0] * cocktailState.progress / 10;
+                TickType_t pouringTicksToWait2 = pouringTicksToWaitBase * cocktailState.mixture[1]  * cocktailState.progress / 10;
 
                 TickType_t progressInterval =
                         pouringTicksToWait1 > pouringTicksToWait2 ? pouringTicksToWait1 : pouringTicksToWait2;
-                progressInterval /= 10;
+                progressInterval /= (cocktailState.progress);
 
                 // Notify ToF_Task to start measuring and check distance once
                 xTaskNotifyGive(globalStruct.tofTaskHandle);
@@ -440,8 +462,8 @@ _Noreturn void animationTask(void *param) {
 
                     while (cocktailState.progress > 0) {
                         // Notify ToF_Task to start measuring
-                        xTaskNotifyGive(globalStruct.tofTaskHandle);
 
+                        xTaskNotifyGive(globalStruct.tofTaskHandle);
                         xQueueReceive(globalStruct.tofQueue, &distance, portMAX_DELAY);
                         if (distance > MAX_CUP_DISTANCE) {
                             pumpData.command = PUMP_OFF;
@@ -453,7 +475,7 @@ _Noreturn void animationTask(void *param) {
                             ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Pouring");
                             draw_number(&disp, 8, 48, 1, cocktailState.progress);
                             ssd1306_show(&disp);
-                            vTaskDelay(DISTANCE_MEASURE_DELAY);
+//                            vTaskDelay(DISTANCE_MEASURE_DELAY);
                             cocktailState.progress--;
                         }
 
@@ -461,6 +483,7 @@ _Noreturn void animationTask(void *param) {
                     }
 
                     if (cocktailState.progress == 0) {
+//                        vTaskDelay(1000);
                         set_menu_state(&cocktailState, DONE, &disp);
                     }
                 }
@@ -471,7 +494,7 @@ _Noreturn void animationTask(void *param) {
 
                 display_nocup(&disp);
 
-                for (int i = 0; i < 10; ++i) {
+                for (int i = 0; i < 20; ++i) {
                     // Notify ToF_Task to start measuring
                     xTaskNotifyGive(globalStruct.tofTaskHandle);
 
@@ -502,10 +525,13 @@ _Noreturn void animationTask(void *param) {
             case IDLE:
                 // TODO: Play animation
                 idle_counter++;
-                ssd1306_clear(&disp);
-                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Idle");
-                draw_number(&disp, 8, 48, 1, idle_counter);
-                ssd1306_show(&disp);
+                display_idle(&disp, idle_counter);
+//                ssd1306_clear(&disp);
+//                ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, "Idle");
+//                draw_number(&disp, 8, 48, 1, idle_counter);
+//                ssd1306_show(&disp);
+                cocktailState.needsUpdate = false;
+
 
                 break;
         }
@@ -545,7 +571,7 @@ void set_menu_state(CocktailState *cocktailState, MenuState new, ssd1306_t *disp
         case POURING:
             printf("POURING\n");
             if (cocktailState->menuState != NO_CUP) {
-                cocktailState->progress = 0;
+                cocktailState->progress = 10;
             }
             cocktailState->menuState = POURING;
             break;
