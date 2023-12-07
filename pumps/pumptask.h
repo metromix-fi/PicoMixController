@@ -7,10 +7,14 @@
 
 #include <stdint-gcc.h>
 
-#define IN1_PIN 26
+#define PUMP1_PIN 26
+#define PUMP2_PIN 27
+#define PUMP3_PIN 28
 
-#define TIME_TO_POUR_LARGE 1000
-#define TIME_TO_POUR_SMALL 500
+// ~150ml
+#define TIME_TO_POUR_LARGE 100
+// ~100ml
+#define TIME_TO_POUR_SMALL 70
 
 typedef enum PumpIndex {
     PUMP_1 = 0,

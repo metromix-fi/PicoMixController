@@ -128,6 +128,12 @@ static void display_done(ssd1306_t *disp) {
 static void display_mixture(ssd1306_t *disp, int mixture[]) {
     ssd1306_clear(disp);
     ssd1306_bmp_show_image(disp, mixture_image, image_size);
+    for (int i = 0; i < 40; i++) {
+        ssd1306_draw_line(disp, CUP_BASE_X - 9, 59 - i, CUP_BASE_X + 29, 59 - i);
+    }
+    for (int i = 0; i < mixture[0] * 0.4; i++) {
+        draw_dotted_line(disp, CUP_BASE_X - 9, 59 - i, CUP_BASE_X + 29, 59 - i);
+    }
     ssd1306_show(disp);
 }
 
@@ -225,14 +231,7 @@ _Noreturn void animationTask(void *param) {
 //    MenuState state = DRINK_SELECT;
 
     CocktailState cocktailState;
-    cocktailState.inputEvent = -1;
-    cocktailState.menuState = DRINK_SELECT;
-    cocktailState.needsUpdate = true;
-    cocktailState.selectedDrink = DRINK_1;
-    cocktailState.size = SMALL;
-    cocktailState.mixture[0] = 50;
-    cocktailState.mixture[1] = 50;
-    cocktailState.auth = false;
+    set_menu_state(&cocktailState, DRINK_SELECT, &disp);
 
     // drink select
     uint8_t drink = 0;
@@ -273,21 +272,20 @@ _Noreturn void animationTask(void *param) {
             case DRINK_SELECT:
                 switch (cocktailState.inputEvent) {
                     case CW_ROTATION:
-                        drink = mod(drink + 1, amount_drinks);
+                        cocktailState.selectedDrink = mod(cocktailState.selectedDrink = drink+ 1, amount_drinks);
                         break;
                     case CCW_ROTATION:
-                        drink = mod(drink - 1, amount_drinks);
+                        cocktailState.selectedDrink = mod(cocktailState.selectedDrink = drink- 1, amount_drinks);
                         break;
                     case PUSH:
                         // confirm drink and change cocktailState
-                        cocktailState.selectedDrink = drink;
                         set_menu_state(&cocktailState, SIZE_SELECT, &disp);
                         cocktailState.inputEvent = -1;
                 }
 
                 if (!cocktailState.needsUpdate) {
 //                    ssd1306_draw_string_with_font(&disp, 8, 24, 1, acme_font, words[drink]);
-                    display_drink_select(&disp, drink);
+                    display_drink_select(&disp,cocktailState.selectedDrink = drink);
                 }
 
                 break;
@@ -329,6 +327,7 @@ _Noreturn void animationTask(void *param) {
                     case PUSH:
                         // confirm mixture and change cocktailState
                         set_menu_state(&cocktailState, AUTHENTICATION, &disp);
+//                        set_menu_state(&cocktailState, POURING, &disp);
                         cocktailState.inputEvent = -1;
                 }
 
@@ -346,8 +345,6 @@ _Noreturn void animationTask(void *param) {
 
                 break;
             case AUTHENTICATION:
-                printf("AUTHENTICATION\n");
-
                 display_auth(&disp);
 
                 bool auth = false;
@@ -363,8 +360,6 @@ _Noreturn void animationTask(void *param) {
                 }
                 break;
             case ERROR:
-                printf("ERROR\n");
-
                 display_error(&disp);
 
                 vTaskDelay(3000);
@@ -372,7 +367,6 @@ _Noreturn void animationTask(void *param) {
                 break;
             case POURING:
                 printf("POURING\n");
-
 //                uint8_t sizePrescaler = cocktailState.size == SMALL ? 1 : 2;
                 TickType_t pouringTicksToWaitBase =
                         cocktailState.size == SMALL ? TIME_TO_POUR_SMALL : TIME_TO_POUR_LARGE;
@@ -409,10 +403,26 @@ _Noreturn void animationTask(void *param) {
                             xQueueSendToBack(globalStruct.pumpControllerQueue, &pumpData, portMAX_DELAY);
                             break;
                         case DRINK_2:
-                            //  TODO: implement
+                            pumpData.command = PUMP_ON;
+                            pumpData.pumpNumber = PUMP_1;
+                            pumpData.timeToPour = pouringTicksToWait1;
+                            xQueueSendToBack(globalStruct.pumpControllerQueue, &pumpData, portMAX_DELAY);
+
+                            pumpData.command = PUMP_ON;
+                            pumpData.pumpNumber = PUMP_3;
+                            pumpData.timeToPour = pouringTicksToWait2;
+                            xQueueSendToBack(globalStruct.pumpControllerQueue, &pumpData, portMAX_DELAY);
                             break;
                         case DRINK_3:
-                            // TODO: implement
+                            pumpData.command = PUMP_ON;
+                            pumpData.pumpNumber = PUMP_2;
+                            pumpData.timeToPour = pouringTicksToWait1;
+                            xQueueSendToBack(globalStruct.pumpControllerQueue, &pumpData, portMAX_DELAY);
+
+                            pumpData.command = PUMP_ON;
+                            pumpData.pumpNumber = PUMP_3;
+                            pumpData.timeToPour = pouringTicksToWait2;
+                            xQueueSendToBack(globalStruct.pumpControllerQueue, &pumpData, portMAX_DELAY);
                             break;
                     }
 
@@ -492,6 +502,13 @@ void set_menu_state(CocktailState *cocktailState, MenuState new, ssd1306_t *disp
     switch (new) {
         case DRINK_SELECT:
             printf("DRINK_SELECT\n");
+            cocktailState->inputEvent = -1;
+            cocktailState->needsUpdate = true;
+            cocktailState->selectedDrink = DRINK_1;
+            cocktailState->size = SMALL;
+            cocktailState->mixture[0] = 50;
+            cocktailState->mixture[1] = 50;
+            cocktailState->auth = false;
             cocktailState->menuState = DRINK_SELECT;
             break;
         case SIZE_SELECT:
@@ -527,7 +544,7 @@ void set_menu_state(CocktailState *cocktailState, MenuState new, ssd1306_t *disp
             cocktailState->menuState = DONE;
             break;
         case IDLE:
-            printf("IDLE\n");
+//            printf("IDLE\n");
             cocktailState->menuState = IDLE;
             break;
 

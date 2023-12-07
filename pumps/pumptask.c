@@ -16,8 +16,14 @@ typedef struct PumpState {
 } PumpState;
 
 void setup_pump_gpios(void) {
-    gpio_init(IN1_PIN);
-    gpio_set_dir(IN1_PIN, GPIO_OUT);
+    gpio_init(PUMP1_PIN);
+    gpio_set_dir(PUMP1_PIN, GPIO_OUT);
+
+    gpio_init(PUMP2_PIN);
+    gpio_set_dir(PUMP2_PIN, GPIO_OUT);
+
+    gpio_init(PUMP3_PIN);
+    gpio_set_dir(PUMP3_PIN, GPIO_OUT);
 }
 
 void switch_current_queue(QueueHandle_t *currentTaskQueue) {
@@ -40,11 +46,11 @@ _Noreturn void pumpControllerTask(void *pvParameters) {
         xQueueReceive(globalStruct.pumpControllerQueue, &pumpData, portMAX_DELAY);
         switch (pumpData.command) {
             case PUMP_OFF:
-                xQueueSendToBack(&globalStruct.pumpTask1Queue, &pumpData, portMAX_DELAY);
-                xQueueSendToBack(&globalStruct.pumpTask2Queue, &pumpData, portMAX_DELAY);
+                xQueueSendToBack(globalStruct.pumpTask1Queue, &pumpData, portMAX_DELAY);
+                xQueueSendToBack(globalStruct.pumpTask2Queue, &pumpData, portMAX_DELAY);
                 break;
             case PUMP_ON:
-                xQueueSendToBack(&currentTaskQueue, &pumpData, portMAX_DELAY);
+                xQueueSendToBack(currentTaskQueue, &pumpData, portMAX_DELAY);
                 switch_current_queue(&currentTaskQueue);
                 break;
         }
@@ -71,11 +77,27 @@ _Noreturn void pumpTask(void *pvParameters) {
         xQueueReceive(pumpTaskQueue, &pumpData, portMAX_DELAY);
         if (pumpData.command == PUMP_ON) {
             printf("Pump %d on\n", pumpData.pumpNumber);
-            // TODO: switch to pump gpio
-            gpio_put(IN1_PIN, 1);
-            // TODO: check if this works timing wise
-            xQueueReceive(pumpTaskQueue, &pumpData, pumpData.timeToPour);
-            gpio_put(IN1_PIN, 0);
+
+            switch (pumpData.pumpNumber) {
+                case PUMP_1: {
+                    gpio_put(PUMP1_PIN, 1);
+                    xQueueReceive(pumpTaskQueue, &pumpData, pumpData.timeToPour);
+                    gpio_put(PUMP1_PIN, 0);
+                    break;
+                }
+                case PUMP_2: {
+                    gpio_put(PUMP2_PIN, 1);
+                    xQueueReceive(pumpTaskQueue, &pumpData, pumpData.timeToPour);
+                    gpio_put(PUMP2_PIN, 0);
+                    break;
+                }
+                case PUMP_3: {
+                    gpio_put(PUMP3_PIN, 1);
+                    xQueueReceive(pumpTaskQueue, &pumpData, pumpData.timeToPour);
+                    gpio_put(PUMP3_PIN, 0);
+                    break;
+                }
+            }
         }
     }
 }

@@ -10,7 +10,7 @@
 #include "queue.h"
 #include "rfid/mfrc522.h"
 
-#define TLS_CLIENT_SERVER        "192.168.211.226"
+#define TLS_CLIENT_SERVER        "192.168.162.226"
 
 #define TLS_CLIENT_TIMEOUT_SECS  15
 
