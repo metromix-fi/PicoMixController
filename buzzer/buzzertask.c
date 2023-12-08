@@ -12,100 +12,8 @@
 #include "timers.h"
 #include "utils/GlobalState.h"
 
-const int notes[] = {
-        31,
-        33,
-        35,
-        37,
-        39,
-        41,
-        44,
-        46,
-        49,
-        52,
-        55,
-        58,
-        62,
-        65,
-        69,
-        73,
-        78,
-        82,
-        87,
-        93,
-        98,
-        104,
-        110,
-        117,
-        123,
-        131,
-        139,
-        147,
-        156,
-        165,
-        175,
-        185,
-        196,
-        208,
-        220,
-        233,
-        247,
-        262,
-        277,
-        294,
-        311,
-        330,
-        349,
-        370,
-        392,
-        415,
-        440,
-        466,
-        494,
-        523,
-        554,
-        587,
-        622,
-        659,
-        698,
-        740,
-        784,
-        831,
-        880,
-        932,
-        988,
-        1047,
-        1109,
-        1175,
-        1245,
-        1319,
-        1397,
-        1480,
-        1568,
-        1661,
-        1760,
-        1865,
-        1976,
-        2093,
-        2217,
-        2349,
-        2489,
-        2637,
-        2794,
-        2960,
-        3136,
-        3322,
-        3520,
-        3729,
-        3951,
-        4186,
-        4435,
-        4699,
-        4978
-};
-
 void setup_buzzer_gpios(void) {
-    gpio_init(BUZZER_PIN);
+//    gpio_init(BUZZER_PIN);
     gpio_set_function(BUZZER_PIN, GPIO_FUNC_PWM);
 //    gpio_set_dir(BUZZER_PIN, GPIO_OUT);
 }
@@ -138,10 +46,31 @@ _Noreturn void buzzerTask(void *pvParameters) {
 
     BuzzerEvent buzzerEvent;
 
-    int melody1[] = {C3,E3,G3,B3,C4,E4,G4,G4,E4,P,
-            C3,E3,G3,B3,C4,E4,A4,A4,E4,P,
-            D3,F3,AS3,D4,F4,B4,B4,C5,C5,P,C5,C5}
-    ;
+    int melody1[] = {C3, E3, G3, B3, C4, E4, G4, G4, E4, P,
+                     C3, E3, G3, B3, C4, E4, A4, A4, E4, P,
+                     D3, F3, AS3, D4, F4, B4, B4, C5, C5, P, C5, C5};
+
+    int melody2[] = {
+            C4, D4, E4, F4,
+            G4, A4, B4, C5,
+            B4, A4, G4, F4,
+            E4, D4, C4, C4,
+            D4, E4, F4, G4,
+            A4, G4, F4, E4,
+            D4, C4, D4, E4,
+            C4, D4, C4, C4
+    };
+
+    int melody3[] = {
+            E4, G4, E5, C5,
+            D5, B4, C5, A4,
+            G4, E4, F4, A4,
+            G4, F4, E4, E4,
+            C4, E4, D4, F4,
+            E4, C4, A3, G3,
+            E4, G4, E5, C5,
+            D5, B4, C5, E4
+    };
 
     while (true) {
         xQueueReceive(globalStruct.buzzerQueue, &buzzerEvent, portMAX_DELAY);
@@ -150,12 +79,31 @@ _Noreturn void buzzerTask(void *pvParameters) {
             case MELODY_1:
                 for (int i = 0; i < sizeof(melody1); i++) {
                     if (melody1[i] != P) {
-                        play_note(melody1[i -1], 125);
+                        play_note(melody1[i - 1], 125);
+                    } else {
+                        vTaskDelay(125 / portTICK_PERIOD_MS);
+                    }
+                }
+                break;
+            case MELODY_2:
+                for (int i = 0; i < sizeof(melody2); i++) {
+                    if (melody2[i] != P) {
+                        play_note(melody2[i - 1], 125);
+                    } else {
+                        vTaskDelay(125 / portTICK_PERIOD_MS);
+                    }
+                }
+                break;
+            case MELODY_3:
+                for (int i = 0; i < sizeof(melody3); i++) {
+                    if (melody3[i] != P) {
+                        play_note(melody3[i - 1], 125);
                     } else {
                         vTaskDelay(125 / portTICK_PERIOD_MS);
                     }
                 }
                 break;
         }
+        // disable
     }
 }

@@ -268,7 +268,7 @@ _Noreturn void animationTask(void *param) {
     PumpData pumpData;
 
     // buzzer event
-    BuzzerEvent buzzerEvent;
+    BuzzerEvent buzzerEvent = MELODY_1;
 
     for (;;) {
 
@@ -349,8 +349,8 @@ _Noreturn void animationTask(void *param) {
                         break;
                     case PUSH:
                         // confirm mixture and change cocktailState
-//                        set_menu_state(&cocktailState, AUTHENTICATION, &disp);
-                        set_menu_state(&cocktailState, POURING, &disp);
+                        set_menu_state(&cocktailState, AUTHENTICATION, &disp);
+//                        set_menu_state(&cocktailState, POURING, &disp);
                         cocktailState.inputEvent = -1;
                 }
 
@@ -513,7 +513,7 @@ _Noreturn void animationTask(void *param) {
                 break;
             case DONE:
                 // Activate buzzer melody
-                buzzerEvent = MELODY_1;
+                buzzerEvent = (buzzerEvent + 1) % 3;
                 xQueueSendToBack(globalStruct.buzzerQueue, &buzzerEvent, portMAX_DELAY);
 
                 display_done(&disp);
