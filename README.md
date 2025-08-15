@@ -24,6 +24,18 @@ This repository contains the embedded software for a cocktail mixing machine bui
 
 [![Automatic Pouring Stop](https://img.youtube.com/vi/8oJHaJGnRSw/hqdefault.jpg)](https://www.youtube.com/watch?v=8oJHaJGnRSw)
 
+## The Final Product
+
+Here are some images of the final cocktail mixing machine.
+
+**Outside View**
+
+![Pico Mix Controller - Outside](images/pico_mix_outside.jpg)
+
+**Inside View**
+
+![Pico Mix Controller - Inside](images/pico_mix_inside.jpg)
+
 ## Hardware Components
 
 The project is built with the following components:
